@@ -30,6 +30,15 @@ for attempt in $(seq 1 60); do
   sleep 1
 done
 docker exec "$container_name" test -S /run/butler/pi/sessiond.sock
+# Setup/notes socket must be inherited by ingress, without granting pi its group.
+for attempt in $(seq 1 30); do
+  if docker exec "$container_name" test -S /run/butler/workspace/ui.sock; then break; fi
+  sleep 1
+done
+docker exec "$container_name" test -S /run/butler/workspace/ui.sock
+docker exec "$container_name" test -f /data/pi/house-memory.md
+docker exec "$container_name" setpriv --reuid 1002 --regid 1002 --groups 1100 \
+  curl -fsS --unix-socket /run/butler/workspace/ui.sock http://localhost/memory -o /dev/null
 docker exec "$container_name" env -i PATH=/usr/local/bin:/usr/bin:/bin pi --version
 # MCP must start even when a login shell or client drops the virtualenv PATH/PYTHONPATH.
 docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
@@ -46,6 +55,21 @@ docker exec "$container_name" setpriv --reuid 0 --regid 0 --groups 0 \
   --no-new-privs --bounding-set=-all,+dac_override --inh-caps=-all --ambient-caps=-all \
   /opt/venv/bin/python3 -c 'from pathlib import Path; from butler.maintenance import storage_bytes; assert storage_bytes("/data/service") >= Path("/data/service/options.json").stat().st_size > 0'
 docker exec "$container_name" curl -fsS http://127.0.0.1:8504/ -o /dev/null
+# Registration must use the real pinned Pi Web API even without provider/Git login.
+for attempt in $(seq 1 45); do
+  if docker exec "$container_name" /opt/venv/bin/python3 -c '
+import json, urllib.request
+projects = json.load(urllib.request.urlopen("http://127.0.0.1:8504/api/projects", timeout=5))
+assert len([project for project in projects if project["path"] == "/data/workspaces/scratch"]) == 1
+' >/dev/null 2>&1; then break; fi
+  sleep 1
+done
+docker exec "$container_name" /opt/venv/bin/python3 -c '
+import json, urllib.request
+projects = json.load(urllib.request.urlopen("http://127.0.0.1:8504/api/projects", timeout=5))
+scratch = [project for project in projects if project["path"] == "/data/workspaces/scratch"]
+assert len(scratch) == 1 and scratch[0]["name"] == "Home Assistant", projects
+' 
 docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
   --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
   env -i PATH=/opt/runtime/node_modules/.bin:/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \

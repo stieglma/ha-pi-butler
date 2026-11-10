@@ -120,3 +120,61 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
         req.headers = {}
         with self.assertRaises(web.HTTPForbidden):
             await proxy(req)
+
+
+class SetupIngressTests(unittest.IsolatedAsyncioTestCase):
+    async def test_setup_proxy_preserves_conflicts_and_requires_settings_header(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from aiohttp.test_utils import TestClient, TestServer
+        from butler.ingress import CATALOG_CLIENT, WORKSPACE_CLIENT
+        from butler.onboarding import Onboarding, create_app
+        with tempfile.TemporaryDirectory() as tmp:
+            worker = TestClient(TestServer(create_app(Onboarding(), Path(tmp) / 'notes.md')))
+            health = web.Application()
+            async def health_check(request):
+                return web.json_response({'ok': True})
+            health.router.add_get('/health', health_check)
+            admin = TestClient(TestServer(health))
+            await worker.start_server()
+            await admin.start_server()
+            class LocalClient:
+                def __init__(self, client):
+                    self.client = client
+                def request(self, method, url, **kwargs):
+                    return self.client.request(method, url.removeprefix('http://localhost'), **kwargs)
+                def get(self, url):
+                    return self.request('GET', url)
+            front = web.Application()
+            front[WORKSPACE_CLIENT] = LocalClient(worker)
+            front[CATALOG_CLIENT] = LocalClient(admin)
+            front.router.add_route('*', '/{path:.*}', proxy)
+            client = TestClient(TestServer(front))
+            await client.start_server()
+            try:
+                with patch('butler.ingress.INGRESS_PEER', '127.0.0.1'):
+                    response = await client.get('/butler/setup/')
+                    self.assertEqual(response.status, 200)
+                    self.assertIn('What Butler should remember', await response.text())
+                    self.assertIn("script-src 'self'", response.headers['Content-Security-Policy'])
+                    response = await client.get('/butler/setup/status')
+                    self.assertEqual((await response.json())['checks']['ha']['state'], 'ready')
+                    response = await client.get('/butler/setup/memory')
+                    old = await response.json()
+                    payload = {'text': 'Keep the switch powered.', 'version': old['version']}
+                    response = await client.post('/butler/setup/memory', json=payload)
+                    self.assertEqual(response.status, 403)
+                    response = await client.post('/butler/setup/memory', json=payload, headers={'X-Butler-Settings': '1'})
+                    self.assertEqual(response.status, 200)
+                    response = await client.post('/butler/setup/memory', json=payload, headers={'X-Butler-Settings': '1'})
+                    self.assertEqual(response.status, 409)
+                    response = await client.post('/butler/setup/status', json={})
+                    self.assertEqual(response.status, 405)
+                    for name in ('setup.js', 'setup.css'):
+                        response = await client.get('/butler/assets/' + name)
+                        self.assertEqual(response.status, 200)
+            finally:
+                await client.close()
+                await worker.close()
+                await admin.close()

@@ -98,7 +98,39 @@ def setup(config):
         for key, option in [('author_name', 'user.name'), ('author_email', 'user.email')]:
             if config[key]:
                 run('git', 'config', '--local', option, config[key], cwd=repo)
-        return status('ready', 'Add /data/workspaces/repository in Pi Web; use butler-workspace worktree NAME for concurrent tasks.')
+        return status('ready', 'Repository ready. Pi Web project registration retries automatically; use butler-workspace settings and prepare NAME before editing.')
+
+
+def settings(config):
+    """Expose workflow conventions without repository URLs or credentials."""
+    return {key: config[key] for key in (
+        'delivery', 'checkout_branch', 'destination_branch', 'base_branch',
+        'work_branch_prefix', 'forge')}
+
+
+def prepare(config, name):
+    """Select the configured workflow before edits; preserve existing work."""
+    if not config['url']:
+        raise WorkspaceError('No repository configured; run setup first')
+    if config['delivery'] == 'pull_request':
+        return worktree(config, name)
+    repo = ROOT / 'repository'
+    target = branch(config['destination_branch'])
+    with locked():
+        if run('git', 'remote', 'get-url', 'origin', cwd=repo) != config['url']:
+            raise WorkspaceError('Workspace origin differs from configured repository')
+        if run('git', 'status', '--porcelain', cwd=repo):
+            raise WorkspaceError('Checkout has existing changes; preserve and resolve them before preparing another task')
+        run('git', 'fetch', 'origin', target, cwd=repo)
+        # Refuse divergence before changing branches or files.
+        refs = run('git', 'for-each-ref', '--format=%(refname)', 'refs/heads/', cwd=repo).splitlines()
+        if f'refs/heads/{target}' in refs:
+            run('git', 'merge-base', '--is-ancestor', target, f'refs/remotes/origin/{target}', cwd=repo)
+            run('git', 'switch', target, cwd=repo)
+        else:
+            run('git', 'switch', '--track', '-c', target, f'origin/{target}', cwd=repo)
+        run('git', 'merge', '--ff-only', f'refs/remotes/origin/{target}', cwd=repo)
+        return {'path': str(repo), 'branch': target, 'delivery': 'push'}
 
 
 def worktree(config, name):
@@ -203,6 +235,8 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('setup')
     sub.add_parser('status')
+    sub.add_parser('settings')
+    sub.add_parser('prepare').add_argument('name')
     sub.add_parser('worktree').add_argument('name')
     delivery = sub.add_parser('deliver')
     delivery.add_argument('--message', required=True)
@@ -213,12 +247,18 @@ def main():
             result = setup(config)
         elif args.command == 'status':
             result = json.loads(STATUS.read_text()) if STATUS.exists() else {'state': 'pending'}
+        elif args.command == 'settings':
+            result = settings(config)
+        elif args.command == 'prepare':
+            result = prepare(config, args.name)
         elif args.command == 'worktree':
             result = worktree(config, args.name)
         else:
             result = deliver(config, Path.cwd(), args.message)
         print(json.dumps(result, indent=2))
     except (WorkspaceError, OSError, ValueError) as exc:
+        if args.command == 'setup':
+            status('pending', 'Repository setup failed. Check terminal configuration/authentication, then run butler-workspace setup. Existing work is preserved.')
         print(str(exc), file=sys.stderr)
         sys.exit(1)
 

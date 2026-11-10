@@ -2,15 +2,18 @@
 import asyncio
 import json
 from pathlib import Path
+from .onboarding import read_bounded
 from aiohttp import ClientSession, ClientTimeout, UnixConnector, WSMsgType, web
 
 # HA's documented ingress peer. Forwarded headers are never authentication.
 INGRESS_PEER = '172.30.32.2'
 CLIENT = web.AppKey('client', ClientSession)
 CATALOG_CLIENT = web.AppKey('catalog_client', ClientSession)
+WORKSPACE_CLIENT = web.AppKey('workspace_client', ClientSession)
 WEB_ROOT = Path(__file__).parent / 'web'
 ASSET_TYPES = {'access.js': 'text/javascript', 'access-loader.js': 'text/javascript',
-               'policy-model.mjs': 'text/javascript', 'access.css': 'text/css', 'navigation.css': 'text/css'}
+               'policy-model.mjs': 'text/javascript', 'access.css': 'text/css', 'navigation.css': 'text/css',
+               'setup.js': 'text/javascript', 'setup.css': 'text/css'}
 PAGE_HEADERS = {'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'", 'X-Content-Type-Options': 'nosniff'}
 HOP = {'connection', 'upgrade', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
        'te', 'trailer', 'transfer-encoding', 'content-length'}
@@ -22,6 +25,35 @@ async def proxy(request):
         raise web.HTTPForbidden(text='Home Assistant ingress required')
     # Older ingress_entry='/' produced a second slash after HA's prefix.
     path = '/' + request.path.lstrip('/')
+    if path == '/butler/setup/':
+        if request.method != 'GET':
+            raise web.HTTPMethodNotAllowed(request.method, ['GET'])
+        return web.FileResponse(WEB_ROOT / 'setup.html', headers=PAGE_HEADERS)
+    if path in ('/butler/setup/status', '/butler/setup/memory'):
+        saving = request.method == 'POST' and path.endswith('/memory')
+        if request.method != 'GET' and not saving:
+            raise web.HTTPMethodNotAllowed(request.method, ['GET', 'POST'] if path.endswith('/memory') else ['GET'])
+        if saving and (request.headers.get('X-Butler-Settings') != '1' or request.content_type != 'application/json'):
+            raise web.HTTPForbidden(text='Settings request required')
+        payload = await request.read() if saving else None
+        if payload is not None and len(payload) > 524288:
+            raise web.HTTPRequestEntityTooLarge(max_size=524288, actual_size=len(payload))
+        try:
+            async with request.app[WORKSPACE_CLIENT].request(request.method, 'http://localhost/' + path.rsplit('/', 1)[1],
+                    data=payload, headers={'Content-Type': 'application/json', 'X-Butler-Settings': '1'}) as reply:
+                body = await read_bounded(reply, 1048576)
+                result = json.loads(body)
+                if path.endswith('/status') and reply.status == 200:
+                    try:
+                        async with request.app[CATALOG_CLIENT].get('http://localhost/health') as health:
+                            connected = health.status == 200
+                    except Exception:
+                        connected = False
+                    result.setdefault('checks', {})['ha'] = {'state': 'ready' if connected else 'pending',
+                        'help': 'HA read connection verified.' if connected else 'HA read check failed. Inspect app/Core logs and retry.'}
+                return web.json_response(result, status=reply.status, headers={'Cache-Control': 'no-store'})
+        except Exception:
+            return web.json_response({'error': 'Setup service is starting or unavailable. Retry shortly.'}, status=502)
     if path == '/butler/status':
         try:
             status = json.loads(Path('/data/status/repository.json').read_text())
@@ -98,7 +130,7 @@ async def proxy(request):
         response_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP}
         if request.method == 'GET' and path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
             body = await upstream.read()
-            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a>'
+            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><nav id="butler-navigation"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a><a href="butler/setup/" target="_blank" rel="noopener">Setup &amp; house notes</a></nav>'
             body = body.replace(b'</body>', navigation + b'</body>', 1)
             for key in list(response_headers):
                 if key.lower() in {'etag', 'last-modified'}:
@@ -117,6 +149,7 @@ async def main():
     app = web.Application(client_max_size=16777216)
     app[CLIENT] = ClientSession(timeout=ClientTimeout(total=None, sock_connect=10), auto_decompress=False, trust_env=False)
     app[CATALOG_CLIENT] = ClientSession(connector=UnixConnector(path='/run/butler/admin/settings.sock'), timeout=ClientTimeout(total=30), trust_env=False)
+    app[WORKSPACE_CLIENT] = ClientSession(connector=UnixConnector(path='/run/butler/workspace/ui.sock'), timeout=ClientTimeout(total=25), trust_env=False)
     app.router.add_route('*', '/{path:.*}', proxy)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
@@ -127,6 +160,7 @@ async def main():
         await runner.cleanup()
         await app[CLIENT].close()
         await app[CATALOG_CLIENT].close()
+        await app[WORKSPACE_CLIENT].close()
 
 
 if __name__ == '__main__':

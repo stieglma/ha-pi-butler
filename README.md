@@ -11,7 +11,9 @@ app store, install Pi Butler, keep protection mode enabled, and select Open Web 
 The image builds locally on HA; the initial build downloads the pinned tools and
 compiles the terminal dependency. No repository or provider login is needed to
 open the UI. Pi Web opens directly, with a persistent Home Assistant access link to separate
-permission settings. Changes there save and apply immediately.
+permission settings. Changes there save and apply immediately. **Setup & house notes** shows readiness
+checks and editable persistent household knowledge. Scratch/repository projects
+register automatically when ready.
 Use an HA administrator account: Pi Butler is one shared privileged
 workspace, not a separate workspace per HA user.
 
@@ -21,13 +23,14 @@ options, write grants, terminal authentication, delivery and recovery.
 
 The image also bundles structured questions, Powerline footer, dynamic workflows,
 subagents and Claude marketplace. See [bundled packages](pi_butler/DOCS.md#bundled-pi-packages)
-for versions, activation and future skills-marketplace support.
+for versions and activation. The in-repo local marketplace bundles house memory
+and read-only automation explanations, incident investigations and health checks.
 
 The app never shares the live HA configuration directory. Your existing HA Git
 app owns deployment. A delivery to its watched branch can cause deployment.
 
 [Requirements](PLAN.md) · [Detailed implementation plan](IMPLEMENTATION.md) ·
-[App documentation](pi_butler/DOCS.md) · [Validation results](VALIDATION.md)
+[App documentation](pi_butler/DOCS.md) · [Validation results](VALIDATION.md) · [Deferred features](FEATURE_FOLLOW_UP.md)
 
 ## Development
 

@@ -182,7 +182,11 @@ Do not silently substitute direct push when PR authentication or tooling fails. 
 
 Honor configured branches; no hardcoded main branch. Verify PR/MR target and report the resulting URL or pushed commit. Do not merge PRs or restart/reload HA as an implicit delivery step.
 
-Preserve dirty/divergent work and report conflicts. No automatic reset or force-push. Isolate concurrent work in separate Git worktrees.
+Preserve dirty/divergent work and report conflicts. No automatic reset or force-push.
+Before edits, inspect `butler-workspace settings` and use `prepare NAME`: push mode
+works directly on the configured destination branch, while PR mode creates an
+isolated task worktree from the configured base. Do not create a task branch by
+default in push mode. Concurrent tasks must defer or explicitly arrange isolation.
 
 Run local syntax/configuration checks appropriate to changed files and report failures before delivery. A local YAML check is not a complete HA validation, and a live check validates deployed configuration rather than an unmerged candidate.
 

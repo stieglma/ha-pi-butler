@@ -41,6 +41,76 @@ class WorkspaceTests(unittest.TestCase):
         w.run('git', 'add', 'config.yaml', cwd=task)
         return task
 
+    def test_prepare_push_uses_destination_without_task_branch(self):
+        repo = w.ROOT / 'repository'
+        w.run('git', 'switch', '-c', 'old-task', cwd=repo)
+        result = w.prepare(self.config, 'lights')
+        self.assertEqual(Path(result['path']), repo)
+        self.assertEqual(w.run('git', 'branch', '--show-current', cwd=repo), 'deploy')
+        self.assertFalse((w.ROOT / 'tasks').exists())
+        self.assertNotIn('butler/lights', w.run('git', 'branch', cwd=repo))
+
+    def test_prepare_push_fast_forwards(self):
+        (self.seed / 'new.yaml').write_text('switch: []')
+        w.run('git', 'add', '.', cwd=self.seed)
+        w.run('git', 'commit', '-m', 'external', cwd=self.seed)
+        w.run('git', 'push', cwd=self.seed)
+        result = w.prepare(self.config, 'lights')
+        self.assertEqual(w.run('git', 'rev-parse', 'HEAD', cwd=result['path']),
+                         w.run('git', 'rev-parse', 'HEAD', cwd=self.seed))
+
+    def test_prepare_preserves_dirty_and_unpublished_work(self):
+        repo = w.ROOT / 'repository'
+        (repo / 'keep').write_text('unfinished')
+        with self.assertRaises(w.WorkspaceError):
+            w.prepare(self.config, 'lights')
+        self.assertEqual((repo / 'keep').read_text(), 'unfinished')
+        w.run('git', 'add', '.', cwd=repo)
+        w.run('git', 'commit', '-m', 'unfinished', cwd=repo)
+        head = w.run('git', 'rev-parse', 'HEAD', cwd=repo)
+        with self.assertRaises(w.WorkspaceError):
+            w.prepare(self.config, 'lights')
+        self.assertEqual(w.run('git', 'rev-parse', 'HEAD', cwd=repo), head)
+
+    def test_prepare_switches_to_distinct_destination(self):
+        w.run('git', 'push', 'origin', 'deploy:production', cwd=self.seed)
+        result = w.prepare(dict(self.config, destination_branch='production'), 'lights')
+        self.assertEqual(result['branch'], 'production')
+        self.assertEqual(w.run('git', 'branch', '--show-current', cwd=result['path']), 'production')
+        self.assertEqual(w.run('git', 'rev-parse', '--abbrev-ref', '@{upstream}', cwd=result['path']),
+                         'origin/production')
+
+    def test_prepare_divergence_preserves_head_and_files(self):
+        repo = w.ROOT / 'repository'
+        (repo / 'local.yaml').write_text('local: true')
+        w.run('git', 'add', '.', cwd=repo)
+        w.run('git', 'commit', '-m', 'local', cwd=repo)
+        (self.seed / 'remote.yaml').write_text('remote: true')
+        w.run('git', 'add', '.', cwd=self.seed)
+        w.run('git', 'commit', '-m', 'remote', cwd=self.seed)
+        w.run('git', 'push', cwd=self.seed)
+        head = w.run('git', 'rev-parse', 'HEAD', cwd=repo)
+        with self.assertRaises(w.WorkspaceError):
+            w.prepare(self.config, 'lights')
+        self.assertEqual(w.run('git', 'rev-parse', 'HEAD', cwd=repo), head)
+        self.assertEqual((repo / 'local.yaml').read_text(), 'local: true')
+        self.assertFalse((repo / 'remote.yaml').exists())
+
+    def test_prepare_pr_uses_configured_base_and_prefix(self):
+        self.config['delivery'] = 'pull_request'
+        result = w.prepare(self.config, 'lights')
+        self.assertEqual(result['branch'], 'butler/lights')
+        self.assertEqual(Path(result['path']), w.ROOT / 'tasks' / 'lights')
+        self.assertEqual(w.run('git', 'rev-parse', 'HEAD', cwd=result['path']),
+                         w.run('git', 'rev-parse', 'HEAD', cwd=self.seed))
+
+    def test_settings_excludes_url_and_author(self):
+        result = w.settings(self.config)
+        self.assertEqual(result['destination_branch'], 'deploy')
+        self.assertEqual(result['delivery'], 'push')
+        self.assertNotIn('url', result)
+        self.assertNotIn('author_email', result)
+
     def test_optional_repository(self):
         self.assertEqual(w.setup(dict(self.config, url=''))['state'], 'not_configured')
 

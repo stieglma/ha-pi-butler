@@ -120,8 +120,20 @@ A pi-user profile initialization step runs before web/sessiond and merges local
 package paths without replacing provider settings or resource filters. A history
 file remembers defaults offered so user removal persists; new image defaults
 are seeded once. Node 24.15.0 satisfies the marketplace engine requirement.
-The extension loader is bundled; actual custom marketplace/skill content remains
-to be defined. Native HA MCP remains separate from optional marketplace MCP.
+The local `pi_butler/marketplace` now ships the house plugin with five skills.
+A bounded pi-user startup helper invokes the pinned marketplace extension's
+registered commands to add/install/update only this local bundle. It preserves
+user source overrides, disable/removal choices, unrelated configuration and
+global autoapply settings. Native HA MCP remains separate from marketplace MCP.
+
+The pi-owned onboarding worker registers default projects through the live Pi Web
+API and exposes setup status and versioned Markdown house notes on a dedicated
+Unix socket. Its parent directory has the ingress group and setgid bit so the
+socket inherits that group; pi never joins the ingress group and still cannot
+reach the HA permission-admin socket. Ingress serves the checklist/editor and
+performs a live HA config read through the existing protected admin service.
+Automation definition and trace tools are finite reads, resolving configuration
+IDs from current HA automation states. No generic upstream route was introduced.
 
 ## Permission configuration UX (0.1.3)
 

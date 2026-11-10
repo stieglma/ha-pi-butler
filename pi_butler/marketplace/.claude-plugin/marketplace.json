@@ -1,0 +1,14 @@
+{
+  "name": "pi-butler",
+  "owner": {
+    "name": "Pi Butler"
+  },
+  "plugins": [
+    {
+      "name": "house",
+      "source": "./plugins/house",
+      "description": "House memory and read-only Home Assistant investigations",
+      "version": "0.1.0"
+    }
+  ]
+}

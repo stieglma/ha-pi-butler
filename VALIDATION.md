@@ -2,6 +2,35 @@
 
 Date: 2026-11-10. Status: local checks and amd64 container CI pass; live HA acceptance pending.
 
+## Setup, local marketplace and investigation features (2026-11-10)
+
+- 78 Python tests pass locally and inside the amd64 image, including project
+  registration/retry contracts, stale note-edit conflicts, ingress method/header
+  boundaries and narrowly scoped automation-definition/trace reads with redaction.
+- Seven browser policy model tests, all six skill validators, HA metadata,
+  Python compilation, shell syntax and whitespace checks pass.
+- The actual pinned SDK/marketplace lifecycle test passes locally and in the
+  image under Node 24.15.0: local-source installation, repeated startup, discovery
+  of all six skills, plugin-version upgrades, unrelated-config preservation,
+  and respect for user disable/removal choices. No model/API calls are required.
+- Built `pi-butler:test` for linux/amd64 using the running Colima Docker engine
+  (`colima ssh -- docker build ...`). Existing dependency layers were reused.
+- The full container smoke check passes: no-login startup; automatic scratch
+  project registration through the actual pinned Pi Web API; readable house notes
+  through the ingress UID; continued denial of pi access to the permission-admin
+  socket; credential/capability/file boundaries; clean shutdown; and storage-limit
+  restart/shutdown preserving work. Test volumes/containers were removed.
+  An initial concurrent run hit the startup readiness timeout under amd64
+  emulation; serial runs passed, including the final registration assertion.
+- Browser verification against the real ingress and notes handlers with simulated
+  setup/HA responses confirms checklist rendering, note saving, and stale-save
+  rejection while preserving both the editor's draft and the server's newer note.
+- Automation read contracts were checked against Core 2026.11.1's
+  [configuration view](https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/config/view.py)
+  and [trace WebSocket API](https://github.com/home-assistant/core/blob/2026.11.1/homeassistant/components/trace/websocket_api.py).
+  Actual HA automation reads/traces, provider login and remote Git credentials
+  still need live-environment validation. No new live HA acceptance is claimed.
+
 ## Completed locally
 
 - 44 Python tests pass on Python 3.14.6/macOS, including:
@@ -229,3 +258,15 @@ confirmed; browser console output or testing this patch in HA is still needed.
 - Large-workspace responsiveness on the target HA host remains unmeasured.
   CI caching, cache measurements and package-manager cache mounts are deferred
   or skipped as recorded in BUILD_FOLLOW_UP.md.
+
+## Phase 4 repository conventions and debugging
+
+- Added tests against temporary bare Git remotes for direct destination checkout,
+  distinct checkout/destination branches, fast-forward preparation, PR worktrees,
+  and preservation of dirty, unpublished and divergent work.
+- Shared-instruction migration tests cover existing custom notes, repeat startup,
+  fresh installation and symlink rejection.
+- `debug-automation` passes the skill validator. Marketplace discovery expectations
+  now include six skills; the initial plugin version remains 0.1.0.
+- Live HA investigation behavior and the container marketplace lifecycle require
+  runtime validation; local checks do not establish trace/log availability in HA.

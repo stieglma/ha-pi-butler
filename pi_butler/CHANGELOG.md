@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Register scratch/repository projects through Pi Web's API with startup/setup retries.
+- Add an ingress setup checklist and persistent Markdown house-note editor with
+  atomic saves and stale-edit conflict detection.
+- Bundle the local pi-butler marketplace with house memory and five read-only
+  investigation skills; preserve user plugin choices and update local versions.
+- Add finite read tools for automation configuration and retained execution traces.
+- Apply configured direct-push/PR conventions to ordinary repository work and
+  add automation debugging from recent traces, history and available Core logs.
+- Record deferred workflow starters in FEATURE_FOLLOW_UP.md; fix verification and
+  background task status/notifications remain out of scope.
+
 - Move the HA access link to the bottom left and rename it Manage HA AI Access.
 - Document persistent custom skills/MCP setup and project naming/registration limits.
 

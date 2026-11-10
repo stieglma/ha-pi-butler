@@ -12,10 +12,10 @@ configuration directory. This repository does not publish a prebuilt image yet.
 Open Web UI opens Pi Web directly. Its persistent **Manage HA AI Access** link
 opens the permission settings in a separate tab, with live entity and direct-label
 choices and a **Save and apply** button. Pi Web starts without a configured Git repository
-or model login. Add
-`/data/workspaces/scratch` as a project for HA investigations, or
-`/data/workspaces/repository` after successful repository setup. Project registration
-uses the existing Pi Web UI. The permission builder is at `butler/` relative to
+or model login. `/data/workspaces/scratch` is registered automatically as **Home Assistant**.
+After repository setup succeeds, `/data/workspaces/repository` is registered as
+**HA configuration**. Existing project IDs and names are preserved. Registration
+retries after startup and after terminal authentication/setup retries. The permission builder is at `butler/` relative to
 the app's ingress root; repository status is at `butler/status`.
 
 Pi Web sessions are server-side. Disconnecting the browser should leave work
@@ -65,28 +65,88 @@ extension-specific rich progress panels depend on host support. Test these UI
 paths in the actual HA ingress environment. Workflow keyword activation applies
 to interactive input; hosted RPC sessions can use explicit commands/tool requests.
 
-### Our own skills marketplace
+### Bundled local skills marketplace
 
-`pi-claude-marketplace` supports local marketplace directories with
-`.claude-plugin/marketplace.json` as well as Git-hosted marketplaces. We can ship
-that directory in the image and register its skills plugins, or maintain a shared
-Git repository and pin its revision. No marketplace or skills content has been
-authored, imported or auto-enabled in this release; the loader is ready for it.
-For a marketplace you have prepared:
+The in-repository `marketplace/` directory ships at `/opt/butler-marketplace`.
+Startup registers that local source as **pi-butler** and installs the **house**
+plugin using the pinned marketplace extension's command handlers. No model call,
+public marketplace, Git clone or network download is needed. Global `autoapply`
+and unrelated marketplace configuration are not changed.
+
+| Skill command | Use |
+| --- | --- |
+| `/skill:house-explain-automation` | Explain triggers, conditions, branches, targets and suspected conflicts |
+| `/skill:house-why-did-it-happen` | Build an evidence-backed incident timeline |
+| `/skill:house-why-didnt-it-happen` | Find the furthest verified stage and likely blocker |
+| `/skill:house-debug-automation` | Review recent executions, traces, related history and available Core logs |
+| `/skill:house-health-check` | On-demand, grouped findings from states, logs and targeted investigation |
+| `/skill:house-memory` | View, remember, correct or forget house notes |
+
+You can also ask naturally in a Pi Web conversation. All four investigation
+skills are read-only: they do not trigger automations or change configuration.
+They distinguish evidence from inference, disclose missing/truncated data and
+consult relevant house notes. Health checks are on demand, not scheduled.
+
+Installed marketplace state and configuration stay under `/data/pi`. On app
+startup, enabled bundled skills are updated from the local image source. For a
+skill release, bump the house plugin version in both marketplace and plugin
+manifests so the loader detects the update. Existing sessions need `/reload`.
+User skills, unrelated plugins/configuration and house notes are preserved.
+The app does not reinstall a bundled plugin removed after it was first offered,
+re-enable an explicitly disabled plugin, or replace a user-selected source.
+
+Inspect or manage the bundle in Pi Web:
 
 ```text
-/claude:plugin marketplace add /path/to/marketplace
-/claude:plugin list --available
-/claude:plugin install plugin-name@marketplace-name
+/claude:plugin list
+/claude:plugin disable house@pi-butler
+/claude:plugin enable house@pi-butler
+/claude:plugin install house@pi-butler
 /reload
 ```
 
-Use Pi Web's command input or Pi in its terminal. Marketplace configuration and
-installed state live under the persistent Pi profile. Skill-only plugins do not
-require pi-mcp-adapter. Marketplace MCP components specifically require that
-separate adapter, which is not bundled. Pi Butler's HA tools use Pi's built-in
-MCP and remain independent of marketplace plugins. No public marketplace is
-bootstrapped automatically.
+If startup installation failed, retry with:
+
+```text
+/claude:plugin marketplace add /opt/butler-marketplace
+/claude:plugin install house@pi-butler
+/reload
+```
+
+If the marketplace extension itself was removed or filtered out of Pi's package
+settings, re-enable it before using these commands. Marketplace failures are
+logged without preventing Pi Web from opening. No marketplace MCP components
+are included; HA reads continue through Pi Butler's built-in MCP connection.
+
+### Setup checklist and persistent house notes
+
+Open **Setup & house notes** from the persistent Pi Web navigation, or from the
+HA access page. The page is at `butler/setup/` relative to the ingress root.
+It reports model credential configuration, a live HA read check, automatic
+project registration, repository setup and cached Git remote read access.
+Repository/Git checks are optional for HA investigations. Model readiness means
+credentials are configured, not that a paid request has succeeded; a successful
+chat verifies provider access. Custom extension providers may need manual checking.
+Git remote read access does not prove push or PR permissions.
+
+Checks run about every 30 seconds, with bounded command/network timeouts. Git
+remote reads are cached for five minutes; `butler-workspace setup` invalidates the
+cache. **Refresh checks** reloads the most recent checks and checks HA connectivity;
+it does not start a model request or a new Git operation in the browser.
+
+House notes live at `/data/pi/house-memory.md` and can be edited as Markdown on
+this page or via the house-memory skill. User facts/preferences and agent
+observations have separate sections. Notes are shared by app users, persist
+across sessions/restarts/updates and are included in HA app backups. Store useful
+household knowledge, not credentials. Agents consult notes as context, not as
+permission grants or executable instructions, and update them only when asked.
+
+The editor limits notes to 64 KiB, saves atomically and rejects stale versions
+instead of overwriting another edit. Copy unsaved edits before reloading after
+a conflict. Agent edits use the same `/data/pi/.house-memory.lock` file lock.
+The Pi-owned workspace UI socket exposes only setup status and house notes;
+it cannot reach or change HA write permissions. Pi is not added to the ingress
+group, which retains the separate permission-management boundary.
 
 All extension/child-agent code runs as pi and uses the same protected HA socket;
 none receives the Supervisor credential. Model usage and workflow/subagent
@@ -123,12 +183,11 @@ store exposes add/list/get/remove but no rename operation. A friendly name can
 therefore be supplied during creation through the API; renaming an existing
 project while preserving its ID needs an upstream change or a maintained patch.
 
-Automatic registration of `/data/workspaces/repository` after a successful clone
-is feasible using Pi Web's project creation API, checking for an existing project
-by path first. It must handle web-server readiness and retries after terminal Git
-authentication. This is not implemented yet; registration remains manual. Avoid
-editing the live `/data/pi-web/projects.json` registry directly because it is
-managed state and concurrent writes could lose projects.
+The app registers the scratch project and, after successful repository setup,
+the repository project through Pi Web's API, checking for existing paths first.
+It retries server-readiness and setup races without editing the managed
+`projects.json` registry. Existing names/IDs remain intact. Manually closing one
+of these default projects causes registration again at the next setup check.
 
 ## Repository options
 
@@ -204,7 +263,24 @@ available, reports pending setup, and can be retried with `butler-workspace setu
 
 ## Work and delivery
 
-Create separate worktrees for concurrent tasks:
+Inspect the current delivery conventions and prepare a task before editing:
+
+```sh
+butler-workspace settings
+butler-workspace prepare kitchen-lights
+# Change to the path returned by prepare.
+```
+
+Push mode prepares the configured destination branch in the main checkout, without
+creating a task branch. It requires a clean checkout and fast-forwards from the
+remote; local unpublished/divergent commits are preserved and require review.
+PR/MR mode creates a task worktree from the configured base with the configured
+branch prefix. Settings omit the repository URL and credentials. These conventions
+apply to normal conversation as well as skills, and existing installations receive
+updated shared agent guidance at startup.
+
+Do not share an active checkout between concurrent sessions. Defer the other task
+or explicitly arrange isolation. For an isolated task, use:
 
 ```sh
 butler-workspace worktree kitchen-lights
@@ -219,7 +295,8 @@ untracked/unstaged changes and merge conflicts, checks staged YAML (including HA
 tags), JSON, Python and shell syntax, and commits staged changes. Syntax success
 is not full HA validation. Other file types need their own appropriate checks.
 Delivery retries can push an existing commit when no new staged changes exist.
-No reset, force push, merge, HA restart or reload is performed.
+Delivery performs no reset, force push, merge, HA restart or reload. Preparation
+only fast-forwards the local destination branch; it does not create merge commits.
 
 Push delivery checks that the destination's current commit is an ancestor of
 HEAD and reports the verified remote commit. PR mode pushes the task branch,
@@ -237,7 +314,8 @@ to that branch may deploy automatically through that app.
 ## Home Assistant grants
 
 Broad reads are always available: states, runtime config, installed services,
-entity/device/area/label registries, history, calendar events, and Core/app logs.
+entity/device/area/label registries, history, calendar events, automation definitions
+and retained execution traces, and Core/app logs.
 No secret auth storage or arbitrary host/configuration-file reads are exposed.
 
 Open Pi Butler to enter Pi Web directly. The persistent **Manage HA AI Access**
@@ -308,7 +386,17 @@ grant still requires a supported action and integration features before executio
 Use the read-only `access_summary` MCP tool to inspect policy/version and matched
 entities with write grants; an empty list means no write grants, not missing read
 access. Use `states` with `domain: light` or `domain: calendar` to discover readable
-entities. Tools with list results support offset/limit. Pi user MCP configuration
+entities. `automation_config` reads one live automation definition by `entity_id`.
+`automation_traces` lists retained runs for that entity with pagination;
+`automation_trace` reads a specific `run_id`. The service resolves the actual
+configuration ID from HA's automation state instead of using the entity slug.
+These tools expose no generic WebSocket command or write endpoint. Blueprint or
+YAML definitions may be unavailable from HA's configuration API. Trace retention,
+recorder coverage and permissions can limit investigations; a missing trace does
+not prove no run happened. Trace variables/configuration are sensitive diagnostic
+data subject to the same best-effort redaction and response limits.
+
+Tools with list results support offset/limit. Pi user MCP configuration
 is `/data/pi/mcp.json`, with server `pi_butler`. `pi mcp list` diagnoses its state.
 Changing client MCP configuration cannot change the trusted service policy.
 
@@ -368,3 +456,12 @@ preserves browser Host/Origin checks. No external host port is mapped. App start
 stops all processes on a critical child exit so Supervisor can restart coherently.
 If the app fails to start, inspect its HA log; if Git setup is pending, inspect
 terminal authentication and retry. A failed delivery always preserves work.
+
+### Debugging an automation
+
+The house marketplace includes `debug-automation`. Supply an automation name,
+entity ID or configuration ID and optionally a symptom or time window. It reviews
+the last five retained runs by default, explains conditions, branches and action
+outcomes, and correlates relevant entity history and available Core logs. It is
+read-only and reports missing or expired evidence rather than assuming success or
+failure. Configuration changes remain a separately requested task.

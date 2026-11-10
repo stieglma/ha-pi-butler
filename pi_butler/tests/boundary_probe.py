@@ -13,7 +13,7 @@ for path in ['/data/options.json', '/data/service/options.json', '/data/service'
     else:
         os.close(fd)
         raise AssertionError('Protected path is readable: ' + path)
-for path in ['/data', '/etc/passwd', '/etc/pi-butler/workspace.json', '/opt/butler/butler/access.py', '/usr/local/bin/butler-mcp', '/run/butler/access']:
+for path in ['/data', '/etc/passwd', '/etc/pi-butler/workspace.json', '/opt/butler/butler/access.py', '/opt/butler-marketplace', '/usr/local/bin/butler-mcp', '/run/butler/access']:
     assert not os.access(path, os.W_OK), 'Trusted path writable: ' + path
 for proc in Path('/proc').iterdir():
     if proc.name.isdigit():

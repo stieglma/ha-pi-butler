@@ -61,6 +61,9 @@ RUN ln -s /opt/runtime/node_modules/.bin/pi /usr/local/bin/pi \
 # Application metadata and code change independently of installed dependencies.
 COPY bundled-packages.json /opt/runtime/bundled-packages.json
 RUN chmod a-s,go-w /opt/runtime/bundled-packages.json
+COPY runtime/ /opt/runtime/butler/
+COPY marketplace/ /opt/butler-marketplace/
+RUN chmod -R a-s,go-w /opt/runtime/butler /opt/butler-marketplace
 COPY rootfs/ /
 RUN chmod 0755 /usr/local/bin/butler-* \
     && chmod a-s /usr/local/bin/butler-*

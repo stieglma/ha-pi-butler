@@ -164,3 +164,38 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
             await self.access.catalog()
         self.assertEqual(json.dumps(self.access.policy.config, sort_keys=True), before)
         self.assertFalse(self.ha.actions)
+
+
+class AutomationReadTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ha = FakeHA()
+        self.ha.rest = AsyncMock(side_effect=lambda path, **kw:
+            [{'entity_id': 'automation.kitchen', 'attributes': {'id': 'config-id with spaces'}}]
+            if path == '/api/states' else {'alias': 'Kitchen', 'token': self.ha.token})
+        self.ha.ws = AsyncMock(return_value=[{'run_id': 'first'}, {'run_id': 'second'}])
+        self.access = Access({**OPTIONS, 'ha_access': {'enabled': False, 'allow': [], 'deny_entity_ids': []}}, self.ha)
+
+    async def test_configuration_uses_actual_id_and_redacts_without_writes(self):
+        result = await self.access.call('automation_config', {'entity_id': 'automation.kitchen'})
+        self.ha.rest.assert_awaited_with('/api/config/automation/config/config-id%20with%20spaces')
+        self.assertEqual(result['configuration']['token'], '[REDACTED]')
+        self.assertFalse(self.ha.actions)
+
+    async def test_retained_trace_pagination_and_exact_get(self):
+        result = await self.access.call('automation_traces', {'entity_id': 'automation.kitchen', 'limit': 1})
+        self.assertEqual(result['next_offset'], 1)
+        self.ha.ws.assert_awaited_with('trace/list', domain='automation', item_id='config-id with spaces')
+        await self.access.call('automation_trace', {'entity_id': 'automation.kitchen', 'run_id': 'first'})
+        self.ha.ws.assert_awaited_with('trace/get', domain='automation', item_id='config-id with spaces', run_id='first')
+
+    async def test_cannot_forward_other_domains_or_commands(self):
+        for name, args in [('automation_config', {'entity_id': 'light.yes'}),
+                           ('automation_trace', {'entity_id': 'automation.kitchen', 'run_id': ''}),
+                           ('automation_traces', {'entity_id': 'automation.kitchen', 'type': 'trace/debug/stop'})]:
+            with self.subTest(name=name), self.assertRaises(Rejected):
+                await self.access.call(name, args)
+        self.ha.ws.assert_not_awaited()
+        self.ha.rest = AsyncMock(return_value=[{'entity_id': 'automation.kitchen', 'attributes': {}}])
+        with self.assertRaises(Rejected):
+            await self.access.call('automation_config', {'entity_id': 'automation.kitchen'})
+        self.ha.ws.assert_not_awaited()
