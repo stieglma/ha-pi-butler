@@ -127,3 +127,10 @@ Thomas's HA Supervisor reached the amd64 image build for 0.1.1 but failed at
 the same failure. Docker's explicit PATH omitted /usr/sbin, where Debian installs
 account-management commands. Version 0.1.2 restores the administrative PATH and
 explicitly installs passwd. HA runtime acceptance remains pending.
+
+GitHub Actions run 42813700473 built the 0.1.2 image successfully and passed the
+Linux Python tests, plugin smoke, startup/HTTP checks, credential boundary probe,
+ingress denial and clean shutdown. The job then failed only removing the host
+bind-mounted test data, which was correctly root/service-owned by the app.
+The smoke fixture now uses a disposable Docker volume so CI cleanup does not
+need to remove protected files through the runner's unprivileged filesystem.

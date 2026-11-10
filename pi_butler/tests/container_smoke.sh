@@ -3,10 +3,12 @@ set -euo pipefail
 # Run on a Docker-capable Linux runner from repository root.
 task_data=$(mktemp -d)
 container_name=pi-butler-smoke
+task_volume=""
 cleanup() {
   result=$?
   if [ "$result" -ne 0 ]; then docker logs "$container_name" || true; fi
   docker rm -f "$container_name" >/dev/null 2>&1 || true
+  if [ -n "$task_volume" ]; then docker volume rm "$task_volume" >/dev/null; fi
   rm -rf "$task_data"
 }
 trap cleanup EXIT
@@ -15,8 +17,11 @@ import json,sys,yaml
 from pathlib import Path
 Path(sys.argv[1]).write_text(json.dumps(yaml.safe_load(Path('pi_butler/config.yaml').read_text())['options']))
 PY
-docker run -d --name "$container_name" -e SUPERVISOR_TOKEN=boundary-test-placeholder \
-  -v "$task_data:/data" -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test
+task_volume=$(docker volume create)
+docker create --name "$container_name" -e SUPERVISOR_TOKEN=boundary-test-placeholder \
+  -v "$task_volume:/data" -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test
+docker cp "$task_data/options.json" "$container_name:/data/options.json"
+docker start "$container_name"
 for attempt in $(seq 1 60); do
   if docker exec "$container_name" test -S /run/butler/pi/sessiond.sock && \
      docker exec "$container_name" test -S /run/butler/access/access.sock; then
