@@ -1,5 +1,6 @@
 # Node includes the Pi Web-required SDK runtime; Debian supports native node-pty.
 FROM node:24.11.0-bookworm-slim@sha256:76d0ed0ed93bed4f4376211e9d8fddac4d8b3fbdb54cc45955696001a3c91152
+COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /usr/local/bin/uv
 ARG TARGETARCH=amd64
 ENV PYTHONPATH=/opt/butler \
     PATH=/opt/runtime/node_modules/.bin:/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
@@ -7,7 +8,7 @@ ENV PYTHONPATH=/opt/butler \
     PYTHONUNBUFFERED=1
 RUN test "$TARGETARCH" = amd64 \
     && apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-client python3 python3-venv make g++ util-linux \
+    && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-client python3 make g++ util-linux \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 1100 butler-client \
     && usermod -l pi -d /data/home -s /bin/bash node \
@@ -33,9 +34,10 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_
     && install -m 0755 /tmp/glab/bin/glab /usr/local/bin/glab \
     && gh --version && glab --version \
     && rm -rf /tmp/gh* /tmp/glab*
-COPY requirements.txt /opt/butler-requirements.txt
-RUN python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir -r /opt/butler-requirements.txt
+WORKDIR /opt/python
+COPY pyproject.toml uv.lock ./
+RUN UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never \
+    uv sync --locked --no-dev --no-install-project --python /usr/bin/python3 --no-cache
 COPY src/ /opt/butler/
 COPY rootfs/ /
 RUN chmod 0755 /usr/local/bin/butler-* \

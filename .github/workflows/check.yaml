@@ -10,12 +10,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r pi_butler/requirements.txt
-      - run: python -m unittest discover -s pi_butler/tests -v
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.28"
+      - run: uv sync --project pi_butler --locked --python 3.11
+      - run: uv run --project pi_butler --locked python -m unittest discover -s pi_butler/tests -v
         env:
           PYTHONPATH: pi_butler/src
-      - run: python -m compileall -q pi_butler/src
-      - run: python pi_butler/tests/check_metadata.py
+      - run: uv run --project pi_butler --locked python -m compileall -q pi_butler/src
+      - run: uv run --project pi_butler --locked python pi_butler/tests/check_metadata.py
   image:
     runs-on: ubuntu-latest
     steps:
@@ -26,7 +29,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install PyYAML==6.0.3
-      - run: bash pi_butler/tests/container_smoke.sh
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.28"
+      - run: uv sync --project pi_butler --locked --python 3.11
+      - run: uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
       - if: failure()
         run: docker logs pi-butler-smoke || true

@@ -91,3 +91,13 @@ from the actual Pi Web terminal; the probe is not exhaustive exploit testing.
   GitLab and self-hosted auth/PR/MR flows remain pending.
 - Protection resists ordinary shell tools, not kernel exploits or a compromised
   trusted service. Do not relax the single-app authority boundary to fix failures.
+
+## uv migration validation
+
+Replaced requirements.txt with pyproject.toml and uv.lock. Direct dependencies
+remain aiohttp 3.13.2 and PyYAML 6.0.3; the universal lock preserves the prior
+transitive versions, including typing-extensions for Python 3.11/3.12.
+Locked uv sync and all 44 tests pass on Python 3.14.6 and Python 3.11.15 locally.
+Metadata, source compilation and lock consistency checks pass. Docker and CI
+now install from the committed lock with pinned uv 0.11.28. Docker execution
+remains pending because Docker is unavailable here.

@@ -106,3 +106,8 @@ remain ingress, web, session daemon and access. The process supervisor uses
 util-linux setpriv/prlimit rather than S6, with PID 1 signal handling and reaping.
 Milestones 3–4 remain pending Docker/HA execution, deployment-specific fixes and
 backup/restore evidence. No live installation or validated release is claimed.
+
+Python dependencies use a non-packaged uv project in `pi_butler/pyproject.toml`
+and the committed `uv.lock`. Docker and CI run locked sync; runtime processes
+continue to use `/opt/venv` directly. uv 0.11.28 is pinned in CI and by image digest
+in Docker. Source modules retain their existing PYTHONPATH-based deployment.

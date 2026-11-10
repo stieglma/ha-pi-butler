@@ -26,13 +26,17 @@ app owns deployment. A delivery to its watched branch can cause deployment.
 ## Development
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install -r pi_butler/requirements.txt
-PYTHONPATH=pi_butler/src .venv/bin/python -m unittest discover -s pi_butler/tests -v
-.venv/bin/python pi_butler/tests/check_metadata.py
+uv sync --project pi_butler --locked
+PYTHONPATH=pi_butler/src uv run --project pi_butler --locked python -m unittest discover -s pi_butler/tests -v
+uv run --project pi_butler --locked python pi_butler/tests/check_metadata.py
 docker build --platform linux/amd64 -t pi-butler:test pi_butler
-bash pi_butler/tests/container_smoke.sh
+uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
 ```
+
+Python dependencies are declared in `pi_butler/pyproject.toml` and locked in
+`pi_butler/uv.lock`. Use `uv lock --project pi_butler` after dependency changes;
+CI and Docker require the lockfile to stay current. uv manages dependencies at
+build time; app processes use the installed Python environment directly.
 
 The Docker smoke check uses a disposable data directory and placeholder upstream
 credential. It tests startup, privilege boundaries and shutdown without contacting

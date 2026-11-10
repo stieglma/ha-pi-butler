@@ -1,0 +1,12 @@
+[project]
+name = "pi-butler"
+version = "0.1.0"
+description = "Policy-controlled Home Assistant tools and persistent Pi workspace services"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp==3.13.2",
+    "PyYAML==6.0.3",
+]
+
+[tool.uv]
+package = false

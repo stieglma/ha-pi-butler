@@ -10,7 +10,8 @@ Resolved 2026-11-10. Publication and hashes are not proof of HA compatibility.
 | Pi Web | @jmfederico/pi-web 1.202611.1 |
 | GitHub CLI | 2.103.3 |
 | GitLab CLI | 1.128.0 |
-| Python packages | Exact versions in requirements.txt |
+| uv | 0.11.28; OCI digest pinned in Dockerfile |
+| Python dependencies | Direct dependencies in pyproject.toml; complete resolution and hashes in uv.lock |
 
 Npm dependencies and archive integrity values are committed in package-lock.json.
 Pi Web's published artifact resolves the adjacent Pi SDK package; it does not
