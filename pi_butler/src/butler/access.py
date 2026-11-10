@@ -174,8 +174,8 @@ class Access:
     async def catalog(self):
         """Read-only picker data. No endpoint applies policy or edits app options."""
         async with self.semaphore, asyncio.timeout(25):
-            states, registry = await self.snapshot()
-            labels = await self.upstream.ws(REGISTRIES['labels'])
+            (states, registry), labels = await asyncio.gather(
+                self.snapshot(), self.upstream.ws(REGISTRIES['labels']))
             domains = ['light', 'switch', 'input_boolean', 'calendar', 'automation']
             entities = []
             for state in states:

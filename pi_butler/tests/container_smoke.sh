@@ -41,6 +41,10 @@ assert json.loads(result.stdout)["result"]["serverInfo"]["name"] == "pi-butler",
 assert not result.stderr, result.stderr
 '
 docker exec "$container_name" /opt/venv/bin/python3 -c 'import json; from pathlib import Path; manifest=json.loads(Path("/opt/runtime/bundled-packages.json").read_text()); settings=json.loads(Path("/data/pi/settings.json").read_text()); assert all("/opt/runtime/node_modules/"+name in settings["packages"] for name in manifest["packages"])'
+# The separate storage worker must retain access to service-private accounting.
+docker exec "$container_name" setpriv --reuid 0 --regid 0 --groups 0 \
+  --no-new-privs --bounding-set=-all,+dac_override --inh-caps=-all --ambient-caps=-all \
+  /opt/venv/bin/python3 -c 'from pathlib import Path; from butler.maintenance import storage_bytes; assert storage_bytes("/data/service") >= Path("/data/service/options.json").stat().st_size > 0'
 docker exec "$container_name" curl -fsS http://127.0.0.1:8504/ -o /dev/null
 docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
   --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
@@ -53,3 +57,24 @@ docker exec "$container_name" setpriv --reuid 1002 --regid 1002 --groups 1100 \
 test "$(docker exec "$container_name" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/)" = 403
 docker stop -t 15 "$container_name"
 test "$(docker inspect -f '{{.State.ExitCode}}' "$container_name")" = 0
+
+# A sparse file exercises the configured logical-byte limit without filling disk.
+docker run --rm --entrypoint /opt/venv/bin/python3 -v "$task_volume:/data" pi-butler:test -c '
+import json
+from pathlib import Path
+limit = json.loads(Path("/data/service/options.json").read_text())["limits"]["storage_megabytes"]
+with Path("/data/workspaces/scratch/storage-limit-probe").open("wb") as stream:
+    stream.truncate((limit + 1) * 1048576)
+'
+docker start "$container_name"
+for attempt in $(seq 1 30); do
+  if [ "$(docker inspect -f '{{.State.Running}}' "$container_name")" = false ]; then break; fi
+  sleep 1
+done
+test "$(docker inspect -f '{{.State.Running}}' "$container_name")" = false
+test "$(docker inspect -f '{{.State.ExitCode}}' "$container_name")" = 1
+docker run --rm --entrypoint /opt/venv/bin/python3 -v "$task_volume:/data" pi-butler:test -c '
+from pathlib import Path
+assert "Persistent storage limit exceeded" in Path("/data/service/app.log").read_text()
+assert Path("/data/workspaces/scratch/storage-limit-probe").is_file()
+'

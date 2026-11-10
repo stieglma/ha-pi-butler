@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Split Node, Python and CLI dependency builds into independent stages, keeping
+  compilers out of the runtime image.
+- Move storage accounting to a separate maintenance worker and fetch settings
+  labels concurrently with states and entity metadata.
+
 - Treat entity, domain and direct-label selections as independent write grants (OR).
   Update permission previews and diagnostics; explicit exclusions still override grants.
 

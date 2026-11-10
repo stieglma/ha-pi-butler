@@ -180,17 +180,38 @@ def main():
     log.addHandler(handler)
     children = []
     critical = set()
+    storage_exceeded = threading.Event()
 
     def capture(pipe, name):
         for raw in iter(lambda: pipe.readline(8192), b''):
+            if name == 'storage':
+                try:
+                    total = int(raw)
+                    if total < 0:
+                        raise ValueError()
+                except ValueError:
+                    log.error('Invalid storage worker report; stopping processes')
+                    storage_exceeded.set()
+                    STOP.set()
+                    continue
+                if total > options['limits']['storage_megabytes'] * 1048576:
+                    log.error('Persistent storage limit exceeded; stopping processes, preserving saved work. Increase limit or remove old artifacts.')
+                    storage_exceeded.set()
+                    STOP.set()
+                continue
             text = redact(raw.decode('utf-8', 'replace').rstrip(), token)
             log.info('%s %s', name, text)
             print(f'{name}: {text}', flush=True)
         pipe.close()
 
-    def spawn(name, command, uid, gid, groups, env, essential=True):
+    def spawn(name, command, uid, gid, groups, env, essential=True, storage_reader=False):
         # Bound process/FD use without limiting HA host processes or killing saved state.
-        cmd = ['prlimit', '--nproc=256:256', '--nofile=4096:4096', '--core=0:0', '--'] + identity(uid, gid, groups) + command
+        credentials = identity(uid, gid, groups)
+        if storage_reader:
+            # Read private service directories without granting capabilities to Pi.
+            credentials = [value.replace('--bounding-set=-all', '--bounding-set=-all,+dac_override')
+                           for value in credentials]
+        cmd = ['prlimit', '--nproc=256:256', '--nofile=4096:4096', '--core=0:0', '--'] + credentials + command
         process = subprocess.Popen(cmd, env=env, cwd='/data/workspaces/scratch' if uid == PI else '/',
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
         children.append((name, process))
@@ -213,7 +234,8 @@ def main():
           {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': '/opt/butler', 'LANG': 'C.UTF-8'})
     spawn('repository', ['butler-workspace', 'setup'], PI, PI, [SHARED], pi_env, essential=False)
     spawn('maintenance', [sys.executable, '-m', 'butler.maintenance'], PI, PI, [SHARED], pi_env)
-    last_check = 0
+    spawn('storage', [sys.executable, '-m', 'butler.maintenance', '--storage'], 0, 0, [0],
+          {'PATH': '/usr/bin:/bin', 'PYTHONPATH': '/opt/butler', 'LANG': 'C.UTF-8'}, storage_reader=True)
     exit_code = 0
     while not STOP.wait(1):
         # Reap adopted orphan children as well as supervised children.
@@ -229,21 +251,8 @@ def main():
                     break
         except ChildProcessError:
             pass
-        if time.monotonic() - last_check > 60:
-            last_check = time.monotonic()
-            total = 0
-            for root, dirs, files in os.walk('/data', followlinks=False):
-                for file in files:
-                    path = Path(root) / file
-                    try:
-                        stat = path.lstat()
-                        total += stat.st_size
-                    except OSError:
-                        pass
-            if total > options['limits']['storage_megabytes'] * 1048576:
-                log.error('Persistent storage limit exceeded; stopping processes, preserving saved work. Increase limit or remove old artifacts.')
-                STOP.set()
-                exit_code = 1
+    if storage_exceeded.is_set():
+        exit_code = 1
     for _, process in children:
         try:
             os.killpg(process.pid, signal.SIGTERM)

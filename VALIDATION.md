@@ -209,3 +209,23 @@ replaces the MIME database's JS/MJS types with invalid values and confirms the
 asset routes still return JavaScript. All 63 Python tests, 7 JavaScript tests and
 metadata checks pass. The cause of the reported HA loading screen is not yet
 confirmed; browser console output or testing this patch in HA is still needed.
+
+## Dependency stages and runtime responsiveness — 2026-11-10
+
+- Built the linux/amd64 image locally with Colima and Buildx on Apple Silicon.
+  The final runtime stage loads native node-pty and runs Pi, gh and glab without
+  the compiler toolchain; Python and CLI dependencies build independently of npm.
+- All 68 Python tests pass both locally and inside the image. All seven browser
+  policy tests, metadata checks, Python compilation and shell syntax checks pass.
+- CLI/runtime checks and all five bundled Pi plugin checks pass in the image.
+- Full container smoke passes: MCP initialization, web readiness, unprivileged
+  credential/socket boundaries, storage accounting for private service files,
+  normal exit on SIGTERM, and exit 1 when a sparse file exceeds the storage limit.
+  The oversized file is preserved. One initial emulated run exited 139 during
+  the MCP probe; the traced retry passed that probe and the final full run passed.
+- Storage scanning runs in a separate supervised worker with only DAC override
+  capability. Artifact retention remains Pi-owned. Catalog tests verify labels
+  start while the state/entity snapshot is pending.
+- Large-workspace responsiveness on the target HA host remains unmeasured.
+  CI caching, cache measurements and package-manager cache mounts are deferred
+  or skipped as recorded in BUILD_FOLLOW_UP.md.

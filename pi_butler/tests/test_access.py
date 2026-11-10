@@ -141,6 +141,22 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('attributes', json.dumps(result))
         self.assertEqual(self.ha.actions, [])
 
+    async def test_picker_fetches_labels_while_snapshot_is_pending(self):
+        started = asyncio.Event()
+        original_ws = self.ha.ws
+
+        async def ws(command):
+            if command == REGISTRIES['labels']:
+                started.set()
+            else:
+                await asyncio.wait_for(started.wait(), timeout=1)
+            return await original_ws(command)
+
+        self.ha.ws = ws
+        result = await self.access.catalog()
+        self.assertEqual(result['labels'][0]['id'], 'writable')
+        self.assertFalse(self.ha.actions)
+
     async def test_picker_catalog_failure_does_not_change_policy(self):
         before = json.dumps(self.access.policy.config, sort_keys=True)
         self.ha.ws = AsyncMock(side_effect=RuntimeError('unavailable'))

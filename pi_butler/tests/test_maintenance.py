@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
-from butler.maintenance import expire
+from butler.maintenance import expire, storage_bytes
 
 
 class RetentionTests(unittest.TestCase):
@@ -29,3 +29,24 @@ class RetentionTests(unittest.TestCase):
             self.assertTrue(fresh.exists())
             self.assertEqual(target.read_text(), 'preserve')
             self.assertTrue((artifacts / 'linked-file').is_symlink())
+
+
+class StorageTests(unittest.TestCase):
+    def test_counts_nested_files_without_following_symlinks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data = root / 'data'
+            data.mkdir()
+            nested = data / 'nested'
+            nested.mkdir()
+            (nested / 'file').write_bytes(b'12345')
+            outside = root / 'outside'
+            outside.mkdir()
+            (outside / 'secret').write_bytes(b'x' * 1000)
+            directory_link = data / 'linked-directory'
+            directory_link.symlink_to(outside, target_is_directory=True)
+            file_link = data / 'linked-file'
+            file_link.symlink_to(outside / 'secret')
+            broken = data / 'broken'
+            broken.symlink_to(root / 'missing')
+            self.assertEqual(storage_bytes(data), 5 + file_link.lstat().st_size + broken.lstat().st_size)
