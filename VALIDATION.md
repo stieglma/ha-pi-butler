@@ -1,6 +1,6 @@
 # Validation record
 
-Date: 2026-11-10. Status: local implementation checked; HA acceptance pending.
+Date: 2026-11-10. Status: local checks and amd64 container CI pass; live HA acceptance pending.
 
 ## Completed locally
 
@@ -31,11 +31,11 @@ Date: 2026-11-10. Status: local implementation checked; HA acceptance pending.
   Git-helper and MR flags; actual forge authentication remains untested.
 - Base image digest resolved; amd64 gh/glab archives downloaded and SHA-256 recorded.
 
-## Not run here
+## Initial local validation limits
 
-Docker is absent in this workspace. The Linux image build, privilege boundary
-probe, container startup/shutdown test and CI workflow have been written but not
-executed. No HA connection or authentication credentials were available. None of
+At initial implementation, Docker was absent in this workspace. The Linux image build, privilege boundary
+probe, container startup/shutdown test and CI workflow were initially written but
+not executed. Subsequent successful remote CI results are recorded below. No HA connection or authentication credentials were available. None of
 the following live checks is claimed to pass.
 
 ## HA integration checklist
@@ -134,3 +134,20 @@ ingress denial and clean shutdown. The job then failed only removing the host
 bind-mounted test data, which was correctly root/service-owned by the app.
 The smoke fixture now uses a disposable Docker volume so CI cleanup does not
 need to remove protected files through the runner's unprivileged filesystem.
+
+## Passed amd64 container CI for 0.1.2
+
+[GitHub Actions run 42814062685](https://github.com/stieglma/ha-pi-butler/actions/runs/42814062685)
+completed successfully for commit cf8d739 on 2026-11-10. Both jobs passed:
+
+- Full amd64 Docker build using the pinned Node and uv images.
+- Python tests, metadata consistency and source compilation on the Linux runner.
+- Python tests inside the built image and all five extensions loaded as uid 1000.
+- Pi/Pi Web/gh/glab versions and Pi Web's native terminal runtime preflight.
+- Fresh startup, default package registration, HTTP serving and daemon socket.
+- Pi-user credential/file/process/capability boundary probe and Unix socket access.
+- Direct ingress rejection, SIGTERM shutdown and Docker-volume fixture cleanup.
+
+This replaces the earlier unexecuted Docker/CI status. Actual HA protection-mode
+behavior, real Supervisor/Core APIs, ingress browser/terminal interactions,
+authentication/delivery and backup/restore checks remain pending.
