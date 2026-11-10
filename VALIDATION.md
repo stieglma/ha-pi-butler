@@ -197,3 +197,15 @@ instead of its explicit `/` HTML route. The app now omits `ingress_entry` and
 normalizes leading slashes before local routing or upstream proxying. Regression
 coverage checks both `//` and `//butler/`; all 63 Python tests and metadata checks
 pass. Real HA verification remains pending.
+
+## 0.1.7 settings startup diagnostics
+
+Settings assets now use explicit JavaScript/CSS content types, no-store caching
+and versioned script/import URLs. An independent loader reports module startup
+failures; catalog fetches abort after 35 seconds with retry guidance. Local
+browser automation blocked the editor module, verified the visible error and
+hidden loading state, then verified reload recovery. An HTTP regression test
+replaces the MIME database's JS/MJS types with invalid values and confirms the
+asset routes still return JavaScript. All 63 Python tests, 7 JavaScript tests and
+metadata checks pass. The cause of the reported HA loading screen is not yet
+confirmed; browser console output or testing this patch in HA is still needed.

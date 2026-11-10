@@ -72,6 +72,14 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
                 async with session.get(front_url + '//butler/', headers=headers) as response:
                     self.assertEqual(response.status, 200)
                     self.assertIn('Save and apply', await response.text())
+                # Module MIME types must not depend on the container's MIME database.
+                from aiohttp.web_fileresponse import CONTENT_TYPES
+                with patch.dict(CONTENT_TYPES.types_map[True], {'.js': 'text/plain', '.mjs': 'application/octet-stream'}):
+                    for asset in ('access-loader.js', 'access.js', 'policy-model.mjs'):
+                        async with session.get(front_url + '/butler/assets/' + asset + '?v=test', headers=headers) as response:
+                            self.assertEqual(response.status, 200)
+                            self.assertEqual(response.content_type, 'text/javascript')
+                            self.assertEqual(response.headers['Cache-Control'], 'no-store')
                 async with session.get(front_url + '/api/test?q=1', headers=headers) as response:
                     self.assertEqual(response.status, 200)
                     self.assertEqual(await response.text(), 'proxied')

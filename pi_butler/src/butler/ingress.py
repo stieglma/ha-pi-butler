@@ -9,6 +9,8 @@ INGRESS_PEER = '172.30.32.2'
 CLIENT = web.AppKey('client', ClientSession)
 CATALOG_CLIENT = web.AppKey('catalog_client', ClientSession)
 WEB_ROOT = Path(__file__).parent / 'web'
+ASSET_TYPES = {'access.js': 'text/javascript', 'access-loader.js': 'text/javascript',
+               'policy-model.mjs': 'text/javascript', 'access.css': 'text/css', 'navigation.css': 'text/css'}
 PAGE_HEADERS = {'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'", 'X-Content-Type-Options': 'nosniff'}
 HOP = {'connection', 'upgrade', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
        'te', 'trailer', 'transfer-encoding', 'content-length'}
@@ -35,9 +37,10 @@ async def proxy(request):
         return web.FileResponse(WEB_ROOT / 'access.html', headers=PAGE_HEADERS)
     if path.startswith('/butler/assets/'):
         name = path.removeprefix('/butler/assets/')
-        if request.method != 'GET' or name not in {'access.js', 'access.css', 'policy-model.mjs', 'navigation.css'}:
+        if request.method != 'GET' or name not in ASSET_TYPES:
             raise web.HTTPNotFound()
-        return web.FileResponse(WEB_ROOT / name, headers={'X-Content-Type-Options': 'nosniff'})
+        return web.FileResponse(WEB_ROOT / name, headers={'X-Content-Type-Options': 'nosniff',
+                                                        'Content-Type': ASSET_TYPES[name], 'Cache-Control': 'no-store'})
     if path in ('/butler/catalog', '/butler/permissions'):
         saving = path.endswith('/permissions')
         expected = 'POST' if saving else 'GET'

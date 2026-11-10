@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 — make settings startup failures visible
+
+- Serve settings scripts with explicit JavaScript MIME types and disable asset
+  caching. Version asset URLs to avoid mixing files from different releases.
+- Show module startup failures with a reload action and time out stalled catalog
+  requests instead of leaving the initial loading message indefinitely.
+
 ## 0.1.6 — fix ingress landing page
 
 - Use HA's default ingress entry to avoid a doubled slash that Pi Web rejects

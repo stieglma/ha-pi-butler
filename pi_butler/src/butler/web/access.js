@@ -1,4 +1,4 @@
-import { categories, cleanPolicy, matchingEntities, validateDraft, catalogWarnings } from './policy-model.mjs';
+import { categories, cleanPolicy, matchingEntities, validateDraft, catalogWarnings } from './policy-model.mjs?v=0.1.7';
 const $ = id => document.getElementById(id);
 let catalog, draft;
 function node(tag, text, className) {
@@ -84,15 +84,17 @@ function updateOutput() {
 }
 async function load() {
   $('loading').hidden=false;$('load-error').hidden=true;$('retry').hidden=true;$('editor').hidden=true;
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),35000);
   try {
-    const reply=await fetch('catalog',{cache:'no-store'});const data=await reply.json();
+    const reply=await fetch('catalog',{cache:'no-store',signal:controller.signal});const data=await reply.json();
     if(!reply.ok)throw new Error(data.error||'Unable to load Home Assistant choices.');
     catalog=data;draft=cleanPolicy(catalog.policy);$('enabled').checked=draft.enabled;
     $('version').textContent=`Active policy version: ${catalog.version}.`;
     $('exclusions').replaceChildren(picker('Excluded entities',catalog.entities,draft.deny_entity_ids,values=>{draft.deny_entity_ids=values;updateOutput();}));
     renderRules();updateOutput();$('editor').hidden=false;
-  } catch(error) {$('load-error').textContent=error.message;$('load-error').hidden=false;$('retry').hidden=false;}
-  finally {$('loading').hidden=true;}
+  } catch(error) {$('load-error').textContent=error.name==='AbortError'?'Home Assistant choices timed out. Check that Pi Butler is running, then retry.':error.message;$('load-error').hidden=false;$('retry').hidden=false;}
+  finally {clearTimeout(timeout);$('loading').hidden=true;}
 }
 $('enabled').addEventListener('change',()=>{draft.enabled=$('enabled').checked;updateOutput();});
 $('add-rule').addEventListener('click',()=>{draft.allow.push({capability:'control',entity_ids:[],domains:[],label_ids:[]});renderRules();updateOutput();});
