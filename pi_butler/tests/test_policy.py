@@ -24,16 +24,30 @@ class PolicyTests(unittest.TestCase):
             with self.assertRaises(Rejected):
                 self.authorize(p, {'entity_ids': ['light.office']})
 
-    def test_rule_and_categories_or_values_or_rules(self):
+    def test_rule_or_categories_or_values_or_rules(self):
         p = policy([rule(domains=['light', 'switch'], label_ids=['writable', 'other']), rule(entity_ids=['switch.fan'])])
         self.assertTrue(p.permits('light.office', 'control', self.registry))
-        self.assertFalse(p.permits('light.nursery', 'control', self.registry))
+        self.assertTrue(p.permits('light.nursery', 'control', self.registry))
         self.assertTrue(p.permits('switch.fan', 'control', self.registry))
 
-    def test_all_three_selectors_intersect(self):
+    def test_all_three_selectors_independently_grant(self):
         p = policy([rule(entity_ids=['light.nursery'], domains=['light'], label_ids=['writable'])])
-        self.assertFalse(p.permits('light.office', 'control', self.registry))
-        self.assertFalse(p.permits('light.nursery', 'control', self.registry))
+        self.assertTrue(p.permits('light.office', 'control', self.registry))
+        self.assertTrue(p.permits('light.nursery', 'control', self.registry))
+
+    def test_each_selector_alone_matches_with_other_selectors_configured(self):
+        p = policy([rule(entity_ids=['switch.fan'], domains=['calendar'], label_ids=['writable'])])
+        for entity in ('switch.fan', 'calendar.thomas', 'light.office', 'light.nursery'):
+            with self.subTest(entity=entity):
+                expected = entity != 'light.nursery'
+                self.assertEqual(p.permits(entity, 'control', self.registry), expected)
+                explanation = p.explain(entity, 'control', self.registry)
+                self.assertEqual(explanation['rules'][0]['matches'], expected)
+                self.assertEqual(explanation['permitted'], expected)
+                self.assertFalse(p.permits(entity, 'trigger_automation', self.registry))
+        for p in (policy(p.config['allow'], enabled=False),
+                  policy(p.config['allow'], deny=['switch.fan'])):
+            self.assertFalse(p.permits('switch.fan', 'control', self.registry))
 
     def test_calendar_label_grant_without_entity_selector(self):
         registry = {'calendar.family': {'labels': ['ai_controllable']},
@@ -43,8 +57,8 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(entities=entities):
                 p = policy([rule(domains=['calendar'], label_ids=['ai_controllable'], **entities)])
                 self.assertTrue(p.permits('calendar.family', 'control', registry))
-                self.assertFalse(p.permits('calendar.work', 'control', registry))
-                self.assertFalse(p.permits('light.office', 'control', registry))
+                self.assertTrue(p.permits('calendar.work', 'control', registry))
+                self.assertTrue(p.permits('light.office', 'control', registry))
 
     def test_grant_requires_at_least_one_nonempty_selector(self):
         for selectors in ({}, {'entity_ids': [], 'domains': [], 'label_ids': []}):

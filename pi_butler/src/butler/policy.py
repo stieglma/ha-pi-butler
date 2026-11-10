@@ -63,30 +63,30 @@ class Policy:
         for rule in self.config["allow"]:
             if rule["capability"] != capability:
                 continue
-            if rule.get("entity_ids") and entity not in rule["entity_ids"]:
-                continue
-            if rule.get("domains") and entity.split('.')[0] not in rule["domains"]:
-                continue
-            if rule.get("label_ids") and not set(labels).intersection(rule["label_ids"]):
-                continue
-            return True
+            if self.matching_selectors(rule, entity, labels):
+                return True
         return False
+
+    @staticmethod
+    def matching_selectors(rule, entity, labels):
+        return [key for key, matches in (
+            ('entity_ids', entity in rule.get('entity_ids', [])),
+            ('domains', entity.split('.')[0] in rule.get('domains', [])),
+            ('label_ids', bool(set(labels).intersection(rule.get('label_ids', [])))),
+        ) if matches]
 
     def explain(self, entity, capability, registry):
         """Explain the same direct-label matching used for authorization."""
         labels = registry.get(entity, {}).get('labels', [])
         rules = []
         for index, rule in enumerate(self.config['allow']):
-            failed = []
-            if rule['capability'] != capability:
-                failed.append('capability')
-            if rule.get('entity_ids') and entity not in rule['entity_ids']:
-                failed.append('entity_ids')
-            if rule.get('domains') and entity.split('.')[0] not in rule['domains']:
-                failed.append('domains')
-            if rule.get('label_ids') and not set(labels).intersection(rule['label_ids']):
-                failed.append('label_ids')
-            rules.append({'rule_index': index, 'matches': not failed, 'failed_filters': failed})
+            matched = self.matching_selectors(rule, entity, labels)
+            capability_matches = rule['capability'] == capability
+            failed = [] if capability_matches else ['capability']
+            if not matched:
+                failed.extend(key for key in sorted(SELECTORS) if rule.get(key))
+            rules.append({'rule_index': index, 'matches': capability_matches and bool(matched),
+                          'matched_selectors': matched, 'failed_filters': failed})
         return {'entity_id': entity, 'capability': capability,
                 'permitted': self.permits(entity, capability, registry),
                 'writes_enabled': self.config['enabled'],

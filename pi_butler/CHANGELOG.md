@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Treat entity, domain and direct-label selections as independent write grants (OR).
+  Update permission previews and diagnostics; explicit exclusions still override grants.
+
 ## 0.1.8 — diagnose denied write grants
 
 - Add read-only access_check for an entity, showing direct labels, failed rule

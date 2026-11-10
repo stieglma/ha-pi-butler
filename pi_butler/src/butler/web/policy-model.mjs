@@ -6,9 +6,9 @@ export function cleanPolicy(policy) {
   })), deny_entity_ids: [...(policy.deny_entity_ids ?? [])] };
 }
 export function ruleMatches(rule, entity) {
-  return (!rule.entity_ids.length || rule.entity_ids.includes(entity.id)) &&
-    (!rule.domains.length || rule.domains.includes(entity.id.split('.')[0])) &&
-    (!rule.label_ids.length || rule.label_ids.some(id => entity.label_ids.includes(id)));
+  return rule.entity_ids.includes(entity.id) ||
+    rule.domains.includes(entity.id.split('.')[0]) ||
+    rule.label_ids.some(id => entity.label_ids.includes(id));
 }
 export function validateDraft(policy) {
   const errors = [];

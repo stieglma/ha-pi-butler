@@ -45,7 +45,7 @@ Do not invoke Pi Web's native user-service installer inside the container.
    No arbitrary API forwarding, templates, events or secret configuration files.
    Time out requests, bound responses and tool concurrency; paginate list tools,
    mark truncation, redact secret fields and known token values.
-6. Implement policy matching with OR across rules, AND across nonempty selector
+6. Implement policy matching with OR across rules and across nonempty selector
    categories and exclusions first. Refresh states/registry for each action;
    require complete registry resolution. Resolve entity/domain/direct-label
    selectors to explicit entities; reject any empty, unknown or denied target.

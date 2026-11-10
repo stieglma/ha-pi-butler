@@ -86,7 +86,7 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([r['entity_id'] for r in result['items']], ['light.yes'])
         self.assertNotIn(self.ha.token, json.dumps(result))
 
-    async def test_access_check_explains_calendar_label_denial_and_grant(self):
+    async def test_access_check_domain_grants_calendar_without_label(self):
         self.access.policy = Policy({'enabled': True, 'allow': [
             {'capability': 'control', 'domains': ['calendar'], 'label_ids': ['ai_controllable']}
         ], 'deny_entity_ids': []})
@@ -95,7 +95,7 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
                       {'entity_id': 'calendar.thomas', 'labels': ['ai_controllable']}):
             self.ha.registry = [entry] if entry else []
             result = await self.access.call('access_check', {'entity_id': 'calendar.thomas'})
-            granted = bool(entry and entry['labels'])
+            granted = True
             self.assertEqual(result['permitted'], granted)
             self.assertEqual(result['registry_entry_found'], entry is not None)
             self.assertTrue(result['state_found'])

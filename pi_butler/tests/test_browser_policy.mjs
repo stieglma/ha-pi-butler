@@ -7,11 +7,11 @@ const entities = [
   {id:'switch.fan', label_ids:[]},
   {id:'automation.evening', label_ids:['writable']},
 ];
-test('rule preview ANDs selectors and exclusions override matches',()=>{
+test('rule preview ORs selectors and exclusions override matches',()=>{
   const rule={capability:'control',entity_ids:[],domains:['light'],label_ids:['writable']};
-  assert.deepEqual(matchingEntities(rule, entities, ['light.nursery']).map(e=>e.id),['light.office']);
+  assert.deepEqual(matchingEntities(rule, entities, ['light.nursery']).map(e=>e.id),['light.office','automation.evening']);
   rule.entity_ids=['switch.fan'];
-  assert.deepEqual(matchingEntities(rule,entities),[]);
+  assert.deepEqual(matchingEntities(rule,entities).map(e=>e.id),['light.office','light.nursery','switch.fan','automation.evening']);
 });
 test('empty rules cannot export or preview an accidental allow-all grant',()=>{
   const rule={capability:'control',entity_ids:[],domains:[],label_ids:[]};

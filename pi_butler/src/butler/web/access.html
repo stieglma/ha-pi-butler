@@ -17,7 +17,7 @@
 <section aria-labelledby="master-title"><div class="switch-row"><div><h2 id="master-title">Allow granted writes</h2><p>Writes need this switch <strong>and</strong> a matching grant below. This never grants access to everything.</p></div><label class="toggle"><input id="enabled" type="checkbox"><span>Enable writes</span></label></div>
 <p id="effective" class="notice"></p><p class="muted">Changes here are a draft. Save to apply permissions immediately. <span id="version"></span></p></section>
 <section aria-labelledby="rules-title"><div class="section-heading"><h2 id="rules-title">Grant rules</h2><button id="add-rule">+ Add rule</button></div>
-<p>Any matching rule grants its capability. Within one rule, the entity, domain and label filters must <strong>all</strong> match. Choose multiple values within a filter to match <strong>any</strong> of them.</p>
+<p>Any matching rule grants its capability. Within one rule, matching <strong>any</strong> selected entity, domain or directly assigned label grants access. Each selection independently allows its matching entities. Explicit exclusions always override grants.</p>
 <p class="muted">Labels count only when assigned directly to an entity. Automation triggering has its own capability.</p>
 <div id="rules"></div><p id="no-rules" class="notice">No grant rules. All runtime writes are denied.</p></section>
 <section aria-labelledby="deny-title"><h2 id="deny-title">Always exclude</h2><p>These entities stay denied even when a grant matches.</p><div id="exclusions"></div></section>
