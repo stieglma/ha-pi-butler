@@ -26,13 +26,19 @@ alone do not prove HA behavior.
 
 ## Phase 6: One-click workflow starters
 
-Potential UI entry points with entity/automation pickers:
-- Explain this automation.
-- Debug this automation's recent executions.
-- Investigate unexpected behavior.
-- Investigate missing behavior.
-- Run a house health check.
+Implemented:
+- “Investigate your home” joins the existing Pi Web navigation links and opens a
+  separate starter page with five workflows.
+- Explain/debug use automation pickers; unexpected/missing behavior use entity
+  pickers, a behavior description and an optional local incident time. Health
+  checks require no inputs. Entity IDs can be entered when discovery is unavailable.
+- Submitting creates a new conversation in the registered Home Assistant scratch
+  project, checks that the selected skill is available, submits its command with
+  structured context and opens that session in Pi Web. Failed submissions retain
+  the session link and prepared request without automatically resubmitting.
+- Debug reuses Phase 4's house-debug-automation skill and last-five-runs default.
+- House health checks also discover HAGHS when available, interpret its exposed
+  scores/recommendations and corroborate significant findings. Missing HAGHS does
+  not prevent the standard check. All investigation instructions remain in skills.
 
-These would launch the marketplace workflows with structured context. Discuss
-placement, what the user supplies, how a session opens and which starters are
-useful before choosing an implementation. Keep workflow instructions in skills.
+Validation of live HA investigations still requires a configured target installation.

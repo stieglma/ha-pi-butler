@@ -66,6 +66,7 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
                     self.assertIn('Pi Web', body)
                     self.assertIn('href="butler/" target="_blank"', body)
                     self.assertNotIn('ETag', response.headers)
+                    self.assertIn('href="butler/starters/"', body)
                 async with session.get(front_url + '//', headers=headers) as response:
                     self.assertEqual(response.status, 200)
                     self.assertIn('Manage HA AI Access', await response.text())
@@ -75,7 +76,7 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
                 # Module MIME types must not depend on the container's MIME database.
                 from aiohttp.web_fileresponse import CONTENT_TYPES
                 with patch.dict(CONTENT_TYPES.types_map[True], {'.js': 'text/plain', '.mjs': 'application/octet-stream'}):
-                    for asset in ('access-loader.js', 'access.js', 'policy-model.mjs'):
+                    for asset in ('access-loader.js', 'access.js', 'policy-model.mjs', 'starters.js', 'starter-model.mjs'):
                         async with session.get(front_url + '/butler/assets/' + asset + '?v=test', headers=headers) as response:
                             self.assertEqual(response.status, 200)
                             self.assertEqual(response.content_type, 'text/javascript')
@@ -102,6 +103,16 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
         result = await proxy(req)
         self.assertEqual(result.status, 200)
         self.assertIn("script-src 'self'", result.headers['Content-Security-Policy'])
+        req.path = '/butler/starters/'
+        result = await proxy(req)
+        self.assertEqual(result.status, 200)
+        req.method = 'POST'
+        with self.assertRaises(web.HTTPMethodNotAllowed):
+            await proxy(req)
+        req.path = '/butler/starters/catalog'
+        with self.assertRaises(web.HTTPMethodNotAllowed):
+            await proxy(req)
+        req.method = 'GET'
         req.path = '/butler/assets/access.js'
         result = await proxy(req)
         self.assertEqual(result.status, 200)
@@ -136,6 +147,9 @@ class SetupIngressTests(unittest.IsolatedAsyncioTestCase):
             async def health_check(request):
                 return web.json_response({'ok': True})
             health.router.add_get('/health', health_check)
+            async def starter_catalog(request):
+                return web.json_response({'entities': [{'id': 'sensor.motion', 'name': 'Motion'}]})
+            health.router.add_get('/starter-catalog', starter_catalog)
             admin = TestClient(TestServer(health))
             await worker.start_server()
             await admin.start_server()
@@ -158,6 +172,10 @@ class SetupIngressTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(response.status, 200)
                     self.assertIn('What Butler should remember', await response.text())
                     self.assertIn("script-src 'self'", response.headers['Content-Security-Policy'])
+                    response = await client.get('/butler/starters/catalog')
+                    self.assertEqual(await response.json(), {'entities': [{'id': 'sensor.motion', 'name': 'Motion'}]})
+                    response = await client.post('/butler/starters/catalog', json={})
+                    self.assertEqual(response.status, 405)
                     response = await client.get('/butler/setup/status')
                     self.assertEqual((await response.json())['checks']['ha']['state'], 'ready')
                     response = await client.get('/butler/setup/memory')

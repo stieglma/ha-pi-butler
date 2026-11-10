@@ -82,10 +82,23 @@ and unrelated marketplace configuration are not changed.
 | `/skill:house-health-check` | On-demand, grouped findings from states, logs and targeted investigation |
 | `/skill:house-memory` | View, remember, correct or forget house notes |
 
-You can also ask naturally in a Pi Web conversation. All four investigation
+You can also ask naturally in a Pi Web conversation. All five investigation
 skills are read-only: they do not trigger automations or change configuration.
 They distinguish evidence from inference, disclose missing/truncated data and
 consult relevant house notes. Health checks are on demand, not scheduled.
+
+Use **Investigate your home** beside the existing Pi Web navigation links to
+open the starter page. Explain and Debug accept an automation; the two incident
+investigations accept any entity, a description and an optional approximate time
+(in your browser's timezone). Debug reviews the last five retained runs. Health
+Check needs no inputs and includes HAGHS scores and recommendations if that
+integration is available, alongside the standard independent checks.
+
+Submitting starts a new conversation in the registered **Home Assistant** scratch
+project and opens it in Pi Web. If the catalog is unavailable, enter an entity ID
+directly. If submission fails after creating a conversation, use the provided link
+to inspect it and the prepared request to continue; the page does not automatically
+resubmit. Disabled or removed house skills are reported rather than re-enabled.
 
 Installed marketplace state and configuration stay under `/data/pi`. On app
 startup, enabled bundled skills are updated from the local image source. For a

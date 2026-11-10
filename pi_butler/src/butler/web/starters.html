@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pi Butler · Investigate your home</title>
+<link rel="stylesheet" href="../assets/setup.css"><link rel="stylesheet" href="../assets/starters.css">
+<script type="module" src="../assets/starters.js"></script></head>
+<body><header><a href="../../">Pi Butler</a><nav><a href="../">Manage HA AI Access</a><a href="../setup/">Setup &amp; house notes</a><a href="../../">Open Pi Web →</a></nav></header>
+<main><h1>Investigate your home</h1><p>Choose a starting point. Butler will open a new conversation to investigate using read-only Home Assistant access.</p>
+<section><form id="starter-form">
+<label for="workflow">What would you like to investigate?</label>
+<select id="workflow" name="workflow">
+<option value="explain">Explain an automation</option>
+<option value="debug">Debug recent executions</option>
+<option value="unexpected">Why did this happen?</option>
+<option value="missing">Why didn’t this happen?</option>
+<option value="health">House health check</option>
+</select><p id="workflow-help" class="muted"></p>
+<div id="target-fields"><label for="target">Automation</label><input id="target" name="target" list="targets" autocomplete="off" maxlength="255" required placeholder="Search by name or entity ID"><datalist id="targets"></datalist>
+<p id="catalog-status" class="muted" role="status">Loading Home Assistant entities…</p><button id="reload-catalog" type="button">Refresh entities</button></div>
+<div id="incident-fields" hidden><label for="behavior">What happened?</label><textarea id="behavior" name="behavior" rows="3" maxlength="4000"></textarea>
+<label for="when">Approximately when?</label><input id="when" name="when" type="datetime-local"><p class="muted">Optional. Uses your browser’s local time zone.</p></div>
+<p class="muted">Starts in the Home Assistant project. No automation will be triggered or configuration changed by these skills.</p>
+<button id="launch" type="submit">Start investigation</button>
+<p id="launch-status" role="status" aria-live="polite"></p><a id="session-link" hidden>Open the created conversation →</a>
+</form></section></main></body></html>

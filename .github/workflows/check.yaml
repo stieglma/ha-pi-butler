@@ -17,7 +17,7 @@ jobs:
       - run: uv run --project pi_butler --locked python -m unittest discover -s pi_butler/tests -v
         env:
           PYTHONPATH: pi_butler/src
-      - run: node --test pi_butler/tests/test_browser_policy.mjs
+      - run: node --test pi_butler/tests/test_browser_policy.mjs pi_butler/tests/test_starters.mjs
       - run: uv run --project pi_butler --locked python -m compileall -q pi_butler/src
       - run: uv run --project pi_butler --locked python pi_butler/tests/check_metadata.py
   image:

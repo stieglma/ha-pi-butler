@@ -2,6 +2,25 @@
 
 Date: 2026-11-10. Status: local checks and amd64 container CI pass; live HA acceptance pending.
 
+## Phase 6 workflow starters (2026-11-10)
+
+- 88 Python tests and 12 Node tests pass locally, including the read-only entity
+  catalog, ingress methods/assets, five skill launch contracts, timezone context,
+  disabled skills, catalog failures and interrupted submissions without retries.
+- Browser checks against fixture APIs confirm all five forms create/submit/open
+  their conversation under an HA ingress prefix. A 390px viewport has no horizontal
+  overflow. These checks simulate HA and Pi Web responses; live session launch
+  against the target installation remains pending.
+- Launch request/response shapes, workspace resolution, session URL parameters and
+  skill-command argument separation were checked against the installed pinned
+  Pi Web 1.202611.1 and Pi SDK 1.5.1 source.
+- The actual pinned marketplace lifecycle smoke check passes, including upgrade
+  from house plugin 0.1.1 to the test's 0.1.2 and preservation of user choices.
+  HA metadata and whitespace checks pass. The image was not rebuilt for this phase.
+- HAGHS health-check guidance follows the integration's published sensor attributes;
+  actual sensor discovery, scoring interpretation and HA investigations still need
+  live-environment acceptance.
+
 ## Setup, local marketplace and investigation features (2026-11-10)
 
 - 78 Python tests pass locally and inside the amd64 image, including project

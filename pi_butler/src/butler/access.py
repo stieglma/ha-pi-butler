@@ -177,6 +177,19 @@ class Access:
                 raise Rejected('Tool result exceeds byte limit; narrow query or page size')
             return result
 
+    async def starter_catalog(self):
+        """All current entity IDs/names for read-only investigations, without attributes."""
+        async with self.semaphore, asyncio.timeout(25):
+            states = await self.upstream.rest('/api/states')
+            result = {'entities': sorted([
+                {'id': state['entity_id'],
+                 'name': state.get('attributes', {}).get('friendly_name') or state['entity_id']}
+                for state in states], key=lambda entity: entity['id'])}
+            result = redact(result, self.upstream.token)
+            if len(json.dumps(result).encode()) > self.limits['response_bytes']:
+                raise Rejected('Picker catalog exceeds byte limit; enter an entity ID directly')
+            return result
+
     async def catalog(self):
         """Read-only picker data. No endpoint applies policy or edits app options."""
         async with self.semaphore, asyncio.timeout(25):
@@ -336,7 +349,7 @@ def applications(access):
 
     async def catalog(req):
         try:
-            return web.json_response(await access.catalog(), headers={'Cache-Control': 'no-store'})
+            return web.json_response(await (access.starter_catalog() if req.path == '/starter-catalog' else access.catalog()), headers={'Cache-Control': 'no-store'})
         except Rejected as exc:
             return web.json_response({'error': str(exc)}, status=400)
         except Exception:
@@ -347,6 +360,7 @@ def applications(access):
     # This socket is reachable by Pi/MCP; it has no permission-management routes.
     admin = web.Application(client_max_size=131072)
     admin.router.add_get('/catalog', catalog)
+    admin.router.add_get('/starter-catalog', catalog)
 
     async def health(req):
         try:

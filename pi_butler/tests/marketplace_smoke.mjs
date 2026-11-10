@@ -67,15 +67,15 @@ try {
   // An image upgrade changes local plugin versions and refreshes installed skills.
   const pluginPath = join(source, 'plugins/house/.claude-plugin/plugin.json');
   const plugin = await json(pluginPath);
-  plugin.version = '0.1.1';
+  plugin.version = '0.1.2';
   await writeFile(pluginPath, JSON.stringify(plugin));
   const marketplacePath = join(source, '.claude-plugin/marketplace.json');
   const marketplace = await json(marketplacePath);
-  marketplace.plugins[0].version = '0.1.1';
+  marketplace.plugins[0].version = '0.1.2';
   await writeFile(marketplacePath, JSON.stringify(marketplace));
   run();
   const statePath = join(agent, 'pi-claude-marketplace/state.json');
-  assert.equal((await json(statePath)).marketplaces['pi-butler'].plugins.house.version, '0.1.1');
+  assert.equal((await json(statePath)).marketplaces['pi-butler'].plugins.house.version, '0.1.2');
 
   // User disable/removal is respected at the next startup.
   config.plugins['house@pi-butler'].enabled = false;

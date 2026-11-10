@@ -13,7 +13,8 @@ WORKSPACE_CLIENT = web.AppKey('workspace_client', ClientSession)
 WEB_ROOT = Path(__file__).parent / 'web'
 ASSET_TYPES = {'access.js': 'text/javascript', 'access-loader.js': 'text/javascript',
                'policy-model.mjs': 'text/javascript', 'access.css': 'text/css', 'navigation.css': 'text/css',
-               'setup.js': 'text/javascript', 'setup.css': 'text/css'}
+               'setup.js': 'text/javascript', 'setup.css': 'text/css',
+               'starters.js': 'text/javascript', 'starter-model.mjs': 'text/javascript', 'starters.css': 'text/css'}
 PAGE_HEADERS = {'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'", 'X-Content-Type-Options': 'nosniff'}
 HOP = {'connection', 'upgrade', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
        'te', 'trailer', 'transfer-encoding', 'content-length'}
@@ -25,6 +26,10 @@ async def proxy(request):
         raise web.HTTPForbidden(text='Home Assistant ingress required')
     # Older ingress_entry='/' produced a second slash after HA's prefix.
     path = '/' + request.path.lstrip('/')
+    if path == '/butler/starters/':
+        if request.method != 'GET':
+            raise web.HTTPMethodNotAllowed(request.method, ['GET'])
+        return web.FileResponse(WEB_ROOT / 'starters.html', headers=PAGE_HEADERS)
     if path == '/butler/setup/':
         if request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
@@ -73,7 +78,7 @@ async def proxy(request):
             raise web.HTTPNotFound()
         return web.FileResponse(WEB_ROOT / name, headers={'X-Content-Type-Options': 'nosniff',
                                                         'Content-Type': ASSET_TYPES[name], 'Cache-Control': 'no-store'})
-    if path in ('/butler/catalog', '/butler/permissions'):
+    if path in ('/butler/catalog', '/butler/starters/catalog', '/butler/permissions'):
         saving = path.endswith('/permissions')
         expected = 'POST' if saving else 'GET'
         if request.method != expected:
@@ -84,7 +89,7 @@ async def proxy(request):
             payload = await request.read() if saving else None
             if payload is not None and len(payload) > 131072:
                 raise web.HTTPRequestEntityTooLarge(max_size=131072, actual_size=len(payload))
-            async with request.app[CATALOG_CLIENT].request(expected, 'http://localhost' + ('/permissions' if saving else '/catalog'), data=payload, headers={'Content-Type': 'application/json'}) as reply:
+            async with request.app[CATALOG_CLIENT].request(expected, 'http://localhost' + ('/permissions' if saving else '/starter-catalog' if path == '/butler/starters/catalog' else '/catalog'), data=payload, headers={'Content-Type': 'application/json'}) as reply:
                 body = bytearray()
                 async for chunk in reply.content.iter_chunked(65536):
                     body.extend(chunk)
@@ -130,7 +135,7 @@ async def proxy(request):
         response_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP}
         if request.method == 'GET' and path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
             body = await upstream.read()
-            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><nav id="butler-navigation"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a><a href="butler/setup/" target="_blank" rel="noopener">Setup &amp; house notes</a></nav>'
+            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><nav id="butler-navigation"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a><a href="butler/setup/" target="_blank" rel="noopener">Setup &amp; house notes</a><a id="butler-starters-link" href="butler/starters/" target="_blank" rel="noopener">Investigate your home</a></nav>'
             body = body.replace(b'</body>', navigation + b'</body>', 1)
             for key in list(response_headers):
                 if key.lower() in {'etag', 'last-modified'}:

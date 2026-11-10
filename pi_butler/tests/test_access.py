@@ -141,6 +141,25 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('attributes', json.dumps(result))
         self.assertEqual(self.ha.actions, [])
 
+    async def test_starter_catalog_includes_readable_sensor_entities_without_policy_or_attributes(self):
+        original_rest = self.ha.rest
+        async def rest(path, **kwargs):
+            result = await original_rest(path, **kwargs)
+            if path == '/api/states':
+                result.append({'entity_id': 'sensor.motion', 'attributes': {
+                    'friendly_name': 'Motion', 'password': self.ha.token}})
+            return result
+        self.ha.rest = rest
+        before = json.dumps(self.access.policy.config, sort_keys=True)
+        result = await self.access.starter_catalog()
+        self.assertIn({'id': 'sensor.motion', 'name': 'Motion'}, result['entities'])
+        self.assertNotIn('sensor.motion', [e['id'] for e in (await self.access.catalog())['entities']])
+        self.assertEqual(set(result), {'entities'})
+        self.assertNotIn(self.ha.token, json.dumps(result))
+        self.assertNotIn('attributes', json.dumps(result))
+        self.assertEqual(json.dumps(self.access.policy.config, sort_keys=True), before)
+        self.assertEqual(self.ha.actions, [])
+
     async def test_picker_fetches_labels_while_snapshot_is_pending(self):
         started = asyncio.Event()
         original_ws = self.ha.ws

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.10 — house investigations and workflow starters
 
 - Register scratch/repository projects through Pi Web's API with startup/setup retries.
 - Add an ingress setup checklist and persistent Markdown house-note editor with
@@ -10,8 +10,10 @@
 - Add finite read tools for automation configuration and retained execution traces.
 - Apply configured direct-push/PR conventions to ordinary repository work and
   add automation debugging from recent traces, history and available Core logs.
-- Record deferred workflow starters in FEATURE_FOLLOW_UP.md; fix verification and
-  background task status/notifications remain out of scope.
+- Add an Investigate your home starter page with entity/automation pickers and
+  new-session launches using the existing house skills, including optional HAGHS
+  evidence in health checks. Fix verification and background task notifications
+  remain out of scope.
 
 - Move the HA access link to the bottom left and rename it Manage HA AI Access.
 - Document persistent custom skills/MCP setup and project naming/registration limits.
