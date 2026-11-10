@@ -35,12 +35,15 @@ docker run --rm --entrypoint /bin/bash pi-butler:test -c 'pi --version && pi-web
 docker run --rm --entrypoint /opt/venv/bin/python3 -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test -m unittest discover -s /tests -v
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/plugin_smoke.mjs
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/marketplace_smoke.mjs
+docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/model_status_smoke.mjs
 uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
 ```
 
 The image checks native node-pty loading and SDK resolution. Plugin smoke loads
 bundled extensions without model calls. Marketplace smoke exercises installation,
-restart, discovery, version upgrades and preservation of user choices. Container
+restart, discovery, version upgrades and preservation of user choices. Model
+readiness smoke checks synthetic subscription/API-key credentials against the
+pinned SDK with HTTP requests blocked and no real credentials. Container
 smoke uses a disposable Docker volume and placeholder credential; it checks startup,
 actual Pi Web project registration, MCP, protected file/process/socket boundaries,
 shutdown and storage-limit recovery without contacting HA. It does not replace

@@ -29,6 +29,7 @@ jobs:
       - run: docker run --rm --entrypoint /opt/venv/bin/python3 -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test -m unittest discover -s /tests -v
       - run: docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/plugin_smoke.mjs
       - run: docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/marketplace_smoke.mjs
+      - run: docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/model_status_smoke.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'

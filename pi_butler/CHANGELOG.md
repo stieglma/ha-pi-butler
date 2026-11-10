@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11 — model readiness and navigation layout
+
+- Stack the Pi Web navigation buttons vertically at the bottom left.
+- Detect configured subscription and API-key credentials in the setup checklist
+  by initializing the SDK’s local authentication status without provider requests.
+
 ## 0.1.10 — house investigations and workflow starters
 
 - Register scratch/repository projects through Pi Web's API with startup/setup retries.
