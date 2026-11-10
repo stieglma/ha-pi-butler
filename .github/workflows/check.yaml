@@ -1,0 +1,32 @@
+name: Check Pi Butler
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r pi_butler/requirements.txt
+      - run: python -m unittest discover -s pi_butler/tests -v
+        env:
+          PYTHONPATH: pi_butler/src
+      - run: python -m compileall -q pi_butler/src
+      - run: python pi_butler/tests/check_metadata.py
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --platform linux/amd64 -t pi-butler:test pi_butler
+      - run: docker run --rm --entrypoint /bin/bash pi-butler:test -c 'pi --version && pi-web --version && gh --version && glab --version && node -e "require(\"/opt/runtime/node_modules/node-pty\")"'
+      - run: docker run --rm --entrypoint /opt/venv/bin/python3 -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test -m unittest discover -s /tests -v
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install PyYAML==6.0.3
+      - run: bash pi_butler/tests/container_smoke.sh
+      - if: failure()
+        run: docker logs pi-butler-smoke || true

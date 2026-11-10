@@ -1,0 +1,62 @@
+name: Pi Butler
+version: 0.1.0
+slug: pi_butler
+description: Persistent Pi Coding Agent workspace with policy-controlled Home Assistant tools
+url: https://github.com/stieglma/ha-pi-butler
+arch: [amd64]
+homeassistant: "2026.11.1"
+startup: application
+boot: auto
+init: false
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:robot
+homeassistant_api: true
+hassio_api: true
+hassio_role: homeassistant
+options:
+  repository:
+    url: ""
+    checkout_branch: main
+    author_name: ""
+    author_email: ""
+    delivery: pull_request
+    destination_branch: main
+    base_branch: main
+    work_branch_prefix: pi-butler/
+    forge: github
+  ha_access:
+    enabled: false
+    allow: []
+    deny_entity_ids: []
+  limits:
+    parallel_requests: 4
+    response_bytes: 2097152
+    log_lines: 500
+    retention_days: 7
+    storage_megabytes: 4096
+schema:
+  repository:
+    url: str
+    checkout_branch: str
+    author_name: str
+    author_email: str
+    delivery: list(push|pull_request)
+    destination_branch: str
+    base_branch: str
+    work_branch_prefix: str
+    forge: list(github|gitlab)
+  ha_access:
+    enabled: bool
+    allow:
+      - capability: list(control|trigger_automation)
+        entity_ids: [str]
+        domains: [str]
+        label_ids: [str]
+    deny_entity_ids: [str]
+  limits:
+    parallel_requests: int(1,16)
+    response_bytes: int(65536,8388608)
+    log_lines: int(1,2000)
+    retention_days: int(1,90)
+    storage_megabytes: int(256,65536)
