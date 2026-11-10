@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 — terminal and MCP startup fixes
+
+- Expose Pi in `/usr/local/bin` so it remains available when login shells reset PATH.
+- Run Butler MCP and workspace commands with the bundled Python and an explicit
+  module path, fixing MCP startup failures caused by missing aiohttp.
+- Add container smoke checks for Pi discovery and MCP initialization with a minimal environment.
+
 ## 0.1.3 — clearer permissions and searchable pickers
 
 - Explain that the write master switch and matching grant rules are both required;

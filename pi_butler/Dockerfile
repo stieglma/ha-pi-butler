@@ -22,6 +22,7 @@ RUN npm ci --omit=dev \
     && test -x node_modules/.bin/pi \
     && node --input-type=module -e "import { createRequire } from 'node:module'; createRequire(import.meta.url)('node-pty'); console.log(import.meta.resolve('@earendil-works/pi-coding-agent'))" \
     && node_modules/.bin/pi --version \
+    && ln -s /opt/runtime/node_modules/.bin/pi /usr/local/bin/pi \
     && npm cache clean --force
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_linux_amd64.tar.gz -o /tmp/gh.tgz \
     && echo '4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d  /tmp/gh.tgz' | sha256sum -c - \

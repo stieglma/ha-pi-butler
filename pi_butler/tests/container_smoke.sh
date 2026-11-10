@@ -30,6 +30,16 @@ for attempt in $(seq 1 60); do
   sleep 1
 done
 docker exec "$container_name" test -S /run/butler/pi/sessiond.sock
+docker exec "$container_name" env -i PATH=/usr/local/bin:/usr/bin:/bin pi --version
+# MCP must start even when a login shell or client drops the virtualenv PATH/PYTHONPATH.
+docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
+  env -i PATH=/usr/local/bin:/usr/bin:/bin /opt/venv/bin/python3 -c '
+import json, subprocess
+request = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26"}}
+result = subprocess.run(["/usr/local/bin/butler-mcp"], input=json.dumps(request)+"\n", text=True, capture_output=True, timeout=10, check=True)
+assert json.loads(result.stdout)["result"]["serverInfo"]["name"] == "pi-butler", result
+assert not result.stderr, result.stderr
+'
 docker exec "$container_name" /opt/venv/bin/python3 -c 'import json; from pathlib import Path; manifest=json.loads(Path("/opt/runtime/package.json").read_text()); settings=json.loads(Path("/data/pi/settings.json").read_text()); assert all("/opt/runtime/node_modules/"+name in settings["packages"] for name in manifest["piButler"]["packages"])'
 docker exec "$container_name" curl -fsS http://127.0.0.1:8504/ -o /dev/null
 docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
