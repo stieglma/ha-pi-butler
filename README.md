@@ -44,6 +44,14 @@ Python dependencies are declared in `pi_butler/pyproject.toml` and locked in
 CI and Docker require the lockfile to stay current. uv manages dependencies at
 build time; app processes use the installed Python environment directly.
 
+The add-on release version lives in `pi_butler/config.yaml`. Do not bump the npm
+manifest/lock or the Python dependency project's fixed `0.0.0` version for app
+releases: those files are Docker dependency-cache inputs. Default extension
+registration lives in `pi_butler/bundled-packages.json`, copied after dependency
+installation. Change dependency manifests and regenerate locks only when their
+inputs change. See [BUILD_FOLLOW_UP.md](BUILD_FOLLOW_UP.md) for remaining build
+optimizations and cache validation.
+
 The Docker smoke check uses a disposable data directory and placeholder upstream
 credential. It tests startup, privilege boundaries and shutdown without contacting
 HA. It does not replace protected-mode testing under Supervisor.

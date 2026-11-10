@@ -115,7 +115,7 @@ in Docker. Source modules retain their existing PYTHONPATH-based deployment.
 ## Bundled extension implementation
 
 The four requested Pi extensions plus pi-claude-marketplace are pinned in the
-npm manifest/lock. piButler.packages is the image-default registration list.
+npm manifest/lock. `bundled-packages.json` contains the image-default registration list.
 A pi-user profile initialization step runs before web/sessiond and merges local
 package paths without replacing provider settings or resource filters. A history
 file remembers defaults offered so user removal persists; new image defaults

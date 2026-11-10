@@ -17,8 +17,9 @@ for key in config['options']:
     assert set(config['options'][key]) == set(config['schema'][key])
 manifest = json.loads((root / 'package.json').read_text())
 lock = json.loads((root / 'package-lock.json').read_text())
-assert len(manifest['piButler']['packages']) == len(set(manifest['piButler']['packages']))
-for name in manifest['piButler']['packages']:
+bundles = json.loads((root / 'bundled-packages.json').read_text())
+assert len(bundles['packages']) == len(set(bundles['packages']))
+for name in bundles['packages']:
     assert manifest['dependencies'][name] == lock['packages']['node_modules/' + name]['version']
 assert 'node_modules/pi-mcp-adapter' not in lock['packages']
 for language in ('en', 'de'):

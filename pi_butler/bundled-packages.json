@@ -1,0 +1,9 @@
+{
+  "packages": [
+    "@juicesharp/rpiv-ask-user-question",
+    "pi-powerline-footer",
+    "@quintinshaw/pi-dynamic-workflows",
+    "pi-subagents",
+    "pi-claude-marketplace"
+  ]
+}

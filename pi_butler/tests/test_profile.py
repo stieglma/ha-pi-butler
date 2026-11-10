@@ -42,7 +42,7 @@ class ProfileTests(unittest.TestCase):
             root = Path(tmp)
             runtime, agent = root / 'runtime', root / 'agent'
             runtime.mkdir(); agent.mkdir()
-            (runtime / 'package.json').write_text(json.dumps({'piButler': {'packages': ['example']}}))
+            (runtime / 'bundled-packages.json').write_text(json.dumps({'packages': ['example']}))
             package = runtime / 'node_modules' / 'example'
             package.mkdir(parents=True)
             (package / 'package.json').write_text(json.dumps({'name': 'example'}))

@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const runtime = resolve(process.argv[2] ?? '/opt/runtime');
-const manifest = JSON.parse(await readFile(join(runtime, 'package.json'), 'utf8'));
+const manifest = JSON.parse(await readFile(join(runtime, 'bundled-packages.json'), 'utf8'));
 const temporary = await mkdtemp(join(tmpdir(), 'butler-plugins-'));
 process.env.HOME = temporary;
 process.env.XDG_CONFIG_HOME = join(temporary, 'config');
@@ -16,7 +16,7 @@ process.env.PI_SKIP_VERSION_CHECK = 'true';
 try {
   const agentDir = process.env.PI_CODING_AGENT_DIR;
   await mkdir(agentDir);
-  const packages = manifest.piButler.packages.map((name) => join(runtime, 'node_modules', name));
+  const packages = manifest.packages.map((name) => join(runtime, 'node_modules', name));
   await writeFile(join(agentDir, 'settings.json'), JSON.stringify({ packages }));
   const sdkRoot = join(runtime, 'node_modules/@earendil-works/pi-coding-agent');
   const sdkManifest = JSON.parse(await readFile(join(sdkRoot, 'package.json'), 'utf8'));
@@ -26,7 +26,7 @@ try {
   await loader.reload();
   const result = loader.getExtensions();
   assert.deepEqual(result.errors, [], 'Every bundled extension must load without errors');
-  for (const name of manifest.piButler.packages) {
+  for (const name of manifest.packages) {
     const packagePath = join(runtime, 'node_modules', name);
     assert(result.extensions.some((extension) => extension.path.startsWith(packagePath + '/')),
       `Extension not loaded: ${name}`);
@@ -36,7 +36,7 @@ try {
   assert(tools.includes('ask_user_question'), 'Structured question tool not registered');
   assert(commands.includes('claude:plugin'), 'Marketplace command not registered');
   assert(loader.getSkills().skills.length > 0, 'Bundled workflow/subagent skills not discovered');
-  console.log(`Loaded all ${manifest.piButler.packages.length} bundled Pi packages; ${tools.length} tools, ${commands.length} commands, ${loader.getSkills().skills.length} skills.`);
+  console.log(`Loaded all ${manifest.packages.length} bundled Pi packages; ${tools.length} tools, ${commands.length} commands, ${loader.getSkills().skills.length} skills.`);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

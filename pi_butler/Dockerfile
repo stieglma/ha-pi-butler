@@ -39,13 +39,20 @@ WORKDIR /opt/python
 COPY pyproject.toml uv.lock ./
 RUN UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never \
     uv sync --locked --no-dev --no-install-project --python /usr/bin/python3 --no-cache
-COPY src/ /opt/butler/
+# Keep dependency cleanup and hardening cached across application changes.
+RUN apt-get purge -y --auto-remove make g++ \
+    && rm -rf /var/lib/apt/lists/* \
+    && find / -xdev -type f \( -perm -4000 -o -perm -2000 \) -exec chmod a-s {} + \
+    && chmod -R go-w /opt/runtime /opt/venv /usr/local/bin
+
+# Application metadata and code change independently of installed dependencies.
+COPY bundled-packages.json /opt/runtime/bundled-packages.json
+RUN chmod a-s,go-w /opt/runtime/bundled-packages.json
 COPY rootfs/ /
 RUN chmod 0755 /usr/local/bin/butler-* \
-    && find / -xdev -type f \( -perm -4000 -o -perm -2000 \) -exec chmod a-s {} + \
-    && chmod -R go-w /opt/butler /opt/runtime /opt/venv /usr/local/bin \
-    && apt-get purge -y --auto-remove make g++ \
-    && rm -rf /var/lib/apt/lists/*
+    && chmod a-s /usr/local/bin/butler-*
+COPY src/ /opt/butler/
+RUN chmod -R a-s,go-w /opt/butler
 WORKDIR /
 EXPOSE 8099
 STOPSIGNAL SIGTERM

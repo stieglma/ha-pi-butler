@@ -1,6 +1,5 @@
 {
   "name": "pi-butler-runtime",
-  "version": "0.1.8",
   "private": true,
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.5.1",
@@ -10,14 +9,5 @@
     "@quintinshaw/pi-dynamic-workflows": "3.15.0",
     "pi-subagents": "0.87.0",
     "pi-claude-marketplace": "0.23.0"
-  },
-  "piButler": {
-    "packages": [
-      "@juicesharp/rpiv-ask-user-question",
-      "pi-powerline-footer",
-      "@quintinshaw/pi-dynamic-workflows",
-      "pi-subagents",
-      "pi-claude-marketplace"
-    ]
   }
 }

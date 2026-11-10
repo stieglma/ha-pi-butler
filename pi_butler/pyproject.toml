@@ -1,6 +1,8 @@
 [project]
 name = "pi-butler"
-version = "0.1.8"
+
+# Dependency-project version only; the add-on release version lives in config.yaml.
+version = "0.0.0"
 description = "Policy-controlled Home Assistant tools and persistent Pi workspace services"
 requires-python = ">=3.11"
 dependencies = [

@@ -57,8 +57,8 @@ def write_json(path, value):
 
 
 def initialize(agent_dir=Path('/data/pi'), runtime=Path('/opt/runtime')):
-    manifest = json.loads((runtime / 'package.json').read_text())
-    names = manifest['piButler']['packages']
+    manifest = json.loads((runtime / 'bundled-packages.json').read_text())
+    names = manifest['packages']
     for name in names:
         if not isinstance(name, str) or not NPM_NAME.fullmatch(name):
             raise ValueError('Invalid bundled package name')
