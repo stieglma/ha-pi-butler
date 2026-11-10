@@ -68,7 +68,7 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
                     self.assertNotIn('ETag', response.headers)
                 async with session.get(front_url + '//', headers=headers) as response:
                     self.assertEqual(response.status, 200)
-                    self.assertIn('Home Assistant access', await response.text())
+                    self.assertIn('Manage HA AI Access', await response.text())
                 async with session.get(front_url + '//butler/', headers=headers) as response:
                     self.assertEqual(response.status, 200)
                     self.assertIn('Save and apply', await response.text())

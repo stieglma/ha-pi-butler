@@ -9,7 +9,7 @@ For a local checkout, copy the `pi_butler` directory into HA's local apps direct
 reload the app store and install the local app. Do not copy it into the live Core
 configuration directory. This repository does not publish a prebuilt image yet.
 
-Open Web UI opens Pi Web directly. Its persistent **Home Assistant access** link
+Open Web UI opens Pi Web directly. Its persistent **Manage HA AI Access** link
 opens the permission settings in a separate tab, with live entity and direct-label
 choices and a **Save and apply** button. Pi Web starts without a configured Git repository
 or model login. Add
@@ -92,6 +92,43 @@ All extension/child-agent code runs as pi and uses the same protected HA socket;
 none receives the Supervisor credential. Model usage and workflow/subagent
 concurrency follow the extension settings; `limits.parallel_requests` only caps
 HA tool calls. Resource/storage safeguards still apply to the app as a whole.
+
+## Custom skills and integrations
+
+User configuration lives in the persistent Pi profile, `/data/pi`, and is retained
+across app restarts and image updates. Add user skills at
+`/data/pi/skills/<skill-name>/SKILL.md`, or repository-specific skills under
+`.pi/skills/<skill-name>/SKILL.md` in the checkout. Each skill needs `name` and
+`description` YAML frontmatter. Use `/reload` in an existing Pi session after edits.
+
+Add custom MCP servers alongside `pi_butler` in `/data/pi/mcp.json`, or use
+`pi mcp add` in the terminal. Repository-specific servers go in `.pi/mcp.json`
+and require project trust. Run `pi mcp list` to check connections, then `/reload`
+in an existing session. Startup preserves additional server entries. Configure
+server credentials in the server configuration or a persistent credential helper;
+arbitrary environment variables are not forwarded by the supervisor.
+
+Keep custom executable integrations and their dependencies under `/data`, for
+example `/data/home/tools`, and use absolute executable paths in MCP settings.
+Changes inside the container image, including system package installations, do
+not persist through image updates. Packages requiring additional system libraries
+may need to be included in the app image. User Pi package declarations in
+`/data/pi/settings.json` are preserved by bundled-package initialization.
+
+### Project setup capabilities
+
+The pinned Pi Web 1.202611.1 package accepts a separate display `name` when adding
+a project. Its current Add Project UI does not supply that field, and its project
+store exposes add/list/get/remove but no rename operation. A friendly name can
+therefore be supplied during creation through the API; renaming an existing
+project while preserving its ID needs an upstream change or a maintained patch.
+
+Automatic registration of `/data/workspaces/repository` after a successful clone
+is feasible using Pi Web's project creation API, checking for an existing project
+by path first. It must handle web-server readiness and retries after terminal Git
+authentication. This is not implemented yet; registration remains manual. Avoid
+editing the live `/data/pi-web/projects.json` registry directly because it is
+managed state and concurrent writes could lose projects.
 
 ## Repository options
 
@@ -203,12 +240,12 @@ Broad reads are always available: states, runtime config, installed services,
 entity/device/area/label registries, history, calendar events, and Core/app logs.
 No secret auth storage or arbitrary host/configuration-file reads are exposed.
 
-Open Pi Butler to enter Pi Web directly. The persistent **Home Assistant access**
+Open Pi Butler to enter Pi Web directly. The persistent **Manage HA AI Access**
 link opens a separate settings tab at `butler/`, available whenever permissions
 need to change. HA's app Configuration page contains repository settings and
 resource limits only.
 
-1. Open **Home Assistant access** from Pi Web.
+1. Open **Manage HA AI Access** from Pi Web.
 2. Add rules and choose entities, domains and directly assigned labels using
    searchable pickers. Check the matching-entity previews and master switch.
 3. Select **Save and apply**. Permissions take effect immediately without a restart.

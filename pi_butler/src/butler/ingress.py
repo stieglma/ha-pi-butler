@@ -98,7 +98,7 @@ async def proxy(request):
         response_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP}
         if request.method == 'GET' and path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
             body = await upstream.read()
-            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Home Assistant access</a>'
+            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a>'
             body = body.replace(b'</body>', navigation + b'</body>', 1)
             for key in list(response_headers):
                 if key.lower() in {'etag', 'last-modified'}:

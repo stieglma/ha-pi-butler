@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Move the HA access link to the bottom left and rename it Manage HA AI Access.
+- Document persistent custom skills/MCP setup and project naming/registration limits.
+
 ## 0.1.9 — independent access grants and faster builds
 
 - Split Node, Python and CLI dependency builds into independent stages, keeping
