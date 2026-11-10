@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Collapse navigation buttons into a top-right “+” menu on small screens so they no longer cover the chat controls.
+
 ## 1.0.0
 
 First stable release of Pi Butler for Home Assistant.

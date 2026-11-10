@@ -12,7 +12,7 @@ CATALOG_CLIENT = web.AppKey('catalog_client', ClientSession)
 WORKSPACE_CLIENT = web.AppKey('workspace_client', ClientSession)
 WEB_ROOT = Path(__file__).parent / 'web'
 ASSET_TYPES = {'access.js': 'text/javascript', 'access-loader.js': 'text/javascript',
-               'policy-model.mjs': 'text/javascript', 'access.css': 'text/css', 'navigation.css': 'text/css',
+               'policy-model.mjs': 'text/javascript', 'access.css': 'text/css', 'navigation.css': 'text/css', 'navigation.js': 'text/javascript',
                'setup.js': 'text/javascript', 'setup.css': 'text/css',
                'starters.js': 'text/javascript', 'starter-model.mjs': 'text/javascript', 'starters.css': 'text/css'}
 PAGE_HEADERS = {'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'", 'X-Content-Type-Options': 'nosniff'}
@@ -135,7 +135,7 @@ async def proxy(request):
         response_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP}
         if request.method == 'GET' and path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
             body = await upstream.read()
-            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><nav id="butler-navigation"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a><a href="butler/setup/" target="_blank" rel="noopener">Setup &amp; house notes</a><a id="butler-starters-link" href="butler/starters/" target="_blank" rel="noopener">Investigate your home</a></nav>'
+            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><nav id="butler-navigation" aria-label="Butler"><button id="butler-navigation-toggle" type="button" aria-label="Toggle Butler menu" aria-expanded="false" aria-controls="butler-navigation-links">+</button><div id="butler-navigation-links"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a><a href="butler/setup/" target="_blank" rel="noopener">Setup &amp; house notes</a><a id="butler-starters-link" href="butler/starters/" target="_blank" rel="noopener">Investigate your home</a></div></nav><script src="butler/assets/navigation.js" defer></script>'
             body = body.replace(b'</body>', navigation + b'</body>', 1)
             for key in list(response_headers):
                 if key.lower() in {'etag', 'last-modified'}:
