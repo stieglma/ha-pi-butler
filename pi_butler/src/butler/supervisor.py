@@ -155,6 +155,17 @@ actual tool error so connection failures can be diagnosed.
         fd = os.open(instructions, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
         with os.fdopen(fd, 'w') as stream:
             stream.write(read_guidance)
+    write_guidance = """
+## Home Assistant write diagnostics
+When access_summary has no matching grants or an action is denied, use
+access_check with the intended entity_id to inspect its direct labels and failed
+rule filters. Report the observed mismatch before suggesting permission changes.
+A configured rule alone does not prove that an entity matches it.
+"""
+    if write_guidance not in instructions.read_text():
+        fd = os.open(instructions, os.O_WRONLY | os.O_APPEND | os.O_NOFOLLOW)
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(write_guidance)
     os.environ.clear()
     return token, options, env
 

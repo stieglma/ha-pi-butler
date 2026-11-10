@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import AsyncMock
 from butler.access import Access, REGISTRIES, redact, interval, validate_args
 from butler.policy import Rejected
+from butler.policy import Policy
 
 OPTIONS = {'ha_access': {'enabled': True, 'allow': [{'capability': 'control', 'domains': ['light']}], 'deny_entity_ids': ['light.no']},
            'limits': {'parallel_requests': 2, 'response_bytes': 65536, 'log_lines': 20}}
@@ -84,6 +85,39 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         result = await self.access.call('access_summary', {})
         self.assertEqual([r['entity_id'] for r in result['items']], ['light.yes'])
         self.assertNotIn(self.ha.token, json.dumps(result))
+
+    async def test_access_check_explains_calendar_label_denial_and_grant(self):
+        self.access.policy = Policy({'enabled': True, 'allow': [
+            {'capability': 'control', 'domains': ['calendar'], 'label_ids': ['ai_controllable']}
+        ], 'deny_entity_ids': []})
+        self.ha.rest = AsyncMock(return_value=[{'entity_id': 'calendar.thomas'}])
+        for entry in (None, {'entity_id': 'calendar.thomas', 'labels': []},
+                      {'entity_id': 'calendar.thomas', 'labels': ['ai_controllable']}):
+            self.ha.registry = [entry] if entry else []
+            result = await self.access.call('access_check', {'entity_id': 'calendar.thomas'})
+            granted = bool(entry and entry['labels'])
+            self.assertEqual(result['permitted'], granted)
+            self.assertEqual(result['registry_entry_found'], entry is not None)
+            self.assertTrue(result['state_found'])
+            self.assertEqual(result['rules'][0]['failed_filters'], [] if granted else ['label_ids'])
+            summary = await self.access.call('access_summary', {})
+            self.assertEqual(summary['total'], int(granted))
+        self.assertFalse(self.ha.actions)
+
+    async def test_access_check_explains_disabled_excluded_and_missing_entity(self):
+        self.access.policy = Policy({'enabled': False, 'allow': [
+            {'capability': 'control', 'domains': ['light']}
+        ], 'deny_entity_ids': ['light.yes']})
+        result = await self.access.call('access_check', {'entity_id': 'light.yes'})
+        self.assertFalse(result['permitted'])
+        self.assertFalse(result['writes_enabled'])
+        self.assertTrue(result['explicitly_denied'])
+        self.assertTrue(result['rules'][0]['matches'])
+        result = await self.access.call('access_check', {'entity_id': 'calendar.missing'})
+        self.assertFalse(result['state_found'])
+        self.assertEqual(result['rules'][0]['failed_filters'], ['domains'])
+        with self.assertRaises(Rejected):
+            await self.access.call('access_check', {'entity_id': 'invalid'})
 
     def test_interval(self):
         for args in [{'start': '2026-11-10'}, {'start': '2026-01-01T00:00:00Z', 'end': '2026-11-10T00:00:00Z'}]:

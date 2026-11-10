@@ -72,6 +72,28 @@ class Policy:
             return True
         return False
 
+    def explain(self, entity, capability, registry):
+        """Explain the same direct-label matching used for authorization."""
+        labels = registry.get(entity, {}).get('labels', [])
+        rules = []
+        for index, rule in enumerate(self.config['allow']):
+            failed = []
+            if rule['capability'] != capability:
+                failed.append('capability')
+            if rule.get('entity_ids') and entity not in rule['entity_ids']:
+                failed.append('entity_ids')
+            if rule.get('domains') and entity.split('.')[0] not in rule['domains']:
+                failed.append('domains')
+            if rule.get('label_ids') and not set(labels).intersection(rule['label_ids']):
+                failed.append('label_ids')
+            rules.append({'rule_index': index, 'matches': not failed, 'failed_filters': failed})
+        return {'entity_id': entity, 'capability': capability,
+                'permitted': self.permits(entity, capability, registry),
+                'writes_enabled': self.config['enabled'],
+                'explicitly_denied': entity in self.config.get('deny_entity_ids', []),
+                'registry_entry_found': entity in registry,
+                'direct_label_ids': labels, 'rules': rules}
+
     def resolve(self, target, states, registry):
         if not isinstance(target, dict) or not target or set(target) - SELECTORS:
             raise Rejected("Use entity_ids, domains or directly assigned label_ids targets")
@@ -99,7 +121,9 @@ class Policy:
         if any(e.split('.')[0] != domain for e in entities):
             raise Rejected("Every target must belong to the action domain")
         if any(not self.permits(e, capability, registry) for e in entities):
-            raise Rejected("At least one target is denied; no actions executed")
+            denied = [e for e in entities if not self.permits(e, capability, registry)]
+            raise Rejected("At least one target is denied; no actions executed. "
+                           "Use access_check with entity_id=" + denied[0] + " to inspect rule matching")
         if domain == "calendar":
             by_id = {s['entity_id']: s for s in states}
             if any(not (int(by_id[e].get('attributes', {}).get('supported_features', 0)) & 1) for e in entities):

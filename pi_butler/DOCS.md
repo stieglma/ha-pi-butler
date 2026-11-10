@@ -261,6 +261,13 @@ catalog. Installed service/parameter support is checked by HA and can vary by
 integration. Scripts, scenes, generic service forwarding, templates and events
 are excluded. Indirect effects through existing HA automations are accepted.
 
+Use the read-only `access_check` MCP tool with an `entity_id` (for example,
+`calendar.thomas`) to diagnose a denied write. It reports the current policy,
+whether the entity exists in states and the registry, its directly assigned label
+IDs, the master switch and exclusion status, and failed filters for each rule.
+Labels on devices or areas do not satisfy a direct entity label rule. A matching
+grant still requires a supported action and integration features before execution.
+
 Use the read-only `access_summary` MCP tool to inspect policy/version and matched
 entities with write grants; an empty list means no write grants, not missing read
 access. Use `states` with `domain: light` or `domain: calendar` to discover readable
