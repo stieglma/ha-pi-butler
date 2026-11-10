@@ -1,108 +1,11 @@
 # Changelog
 
-## 0.1.11 — model readiness and navigation layout
+## 1.0.0
 
-- Stack the Pi Web navigation buttons vertically at the bottom left.
-- Detect configured subscription and API-key credentials in the setup checklist
-  by initializing the SDK’s local authentication status without provider requests.
+First stable release of Pi Butler for Home Assistant.
 
-## 0.1.10 — house investigations and workflow starters
-
-- Register scratch/repository projects through Pi Web's API with startup/setup retries.
-- Add an ingress setup checklist and persistent Markdown house-note editor with
-  atomic saves and stale-edit conflict detection.
-- Bundle the local pi-butler marketplace with house memory and five read-only
-  investigation skills; preserve user plugin choices and update local versions.
-- Add finite read tools for automation configuration and retained execution traces.
-- Apply configured direct-push/PR conventions to ordinary repository work and
-  add automation debugging from recent traces, history and available Core logs.
-- Add an Investigate your home starter page with entity/automation pickers and
-  new-session launches using the existing house skills, including optional HAGHS
-  evidence in health checks. Fix verification and background task notifications
-  remain out of scope.
-
-- Move the HA access link to the bottom left and rename it Manage HA AI Access.
-- Document persistent custom skills/MCP setup and project naming/registration limits.
-
-## 0.1.9 — independent access grants and faster builds
-
-- Split Node, Python and CLI dependency builds into independent stages, keeping
-  compilers out of the runtime image.
-- Move storage accounting to a separate maintenance worker and fetch settings
-  labels concurrently with states and entity metadata.
-- Treat entity, domain and direct-label selections as independent write grants (OR).
-  Update permission previews and diagnostics; explicit exclusions still override grants.
-
-## 0.1.8 — diagnose denied write grants
-
-- Add read-only access_check for an entity, showing direct labels, failed rule
-  filters, registry/state presence, the write switch and explicit exclusions.
-- Point denied actions to the diagnostic tool and guide Pi to inspect mismatches
-  before suggesting permission changes. Authorization rules remain unchanged.
-
-## 0.1.7 — make settings startup failures visible
-
-- Serve settings scripts with explicit JavaScript MIME types and disable asset
-  caching. Version asset URLs to avoid mixing files from different releases.
-- Show module startup failures with a reload action and time out stalled catalog
-  requests instead of leaving the initial loading message indefinitely.
-
-## 0.1.6 — fix ingress landing page
-
-- Use HA's default ingress entry to avoid a doubled slash that Pi Web rejects
-  with FST_STATIC_FORBIDDEN_PATH. Normalize leading slashes for existing tabs.
-
-## 0.1.5 — separate access settings and immediate permission updates
-
-- Open Pi Web directly, with a persistent Home Assistant access link opening
-  permissions in a separate tab.
-- Move permission editing out of HA's static app form. Save and apply validated
-  permissions immediately through an ingress-only management socket, isolated
-  from the agent. Migrate existing grants and keep malformed imports recoverable.
-- Clarify that MCP reads are always available and an empty access summary only
-  means no write grants. Add discovery guidance to existing and new Pi instructions
-  at app startup while preserving user customizations.
-
-## 0.1.4 — terminal and MCP startup fixes
-
-- Expose Pi in `/usr/local/bin` so it remains available when login shells reset PATH.
-- Run Butler MCP and workspace commands with the bundled Python and an explicit
-  module path, fixing MCP startup failures caused by missing aiohttp.
-- Add container smoke checks for Pi discovery and MCP initialization with a minimal environment.
-
-## 0.1.3 — clearer permissions and searchable pickers
-
-- Explain that the write master switch and matching grant rules are both required;
-  add English/German names and descriptions throughout HA's configuration form.
-- Add a native dropdown for supported control domains.
-- Open the app on a permission builder with searchable live entities/direct labels,
-  exclusions, rule previews and YAML export. Applying grants stays in HA's trusted
-  Configuration tab; no policy-writing API is added.
-
-## 0.1.2 — account setup build fix
-
-- Restore administrative executable directories to Docker's build PATH so
-  groupadd/usermod/groupmod/useradd can run on Debian slim.
-- Explicitly install the passwd package providing these account-management tools.
-
-## 0.1.1 — uv and bundled Pi packages
-
-- Replace requirements.txt with pyproject.toml and a committed uv lock; use locked
-  dependency installation in Docker, CI and local development.
-- Bundle structured questions, Powerline footer, dynamic workflows, subagents
-  and Claude marketplace with exact npm versions and local Pi registration.
-- Preserve existing settings, package filters and package removal on restart.
-- Update the pinned Node 24 image to 24.15.0 for marketplace compatibility.
-- Check actual extension loading in CI and correct the ESM SDK build assertion.
-
-## 0.1.0 — first integration candidate
-
-- Add amd64 HA app packaging with Pi 1.5.1 and Pi Web 1.202611.1.
-- Add authenticated ingress proxy, persistent sessions/home/workspaces and terminal.
-- Add isolated HA access service, local MCP bridge, bounded reads/diagnostics,
-  explicit control catalog and default-deny entity/domain/direct-label grants.
-- Add optional Git setup/retry, worktrees and configured push/PR/MR delivery.
-- Add local policy/protocol/Git tests, container CI and an HA validation checklist.
-
-Container build and live HA acceptance remain unverified locally. This release
-is an integration candidate, not a validated production release.
+- Persistent Pi Coding Agent workspace with Pi Web, terminal and saved sessions.
+- Home Assistant reads, diagnostics and permission-controlled actions.
+- Guided setup, editable house notes and investigation starters.
+- Git workspace setup with push and pull request delivery.
+- A new Pi Butler icon combining the Pi mark, a house and a bow tie.

@@ -1,6 +1,6 @@
 # Testing and live acceptance
 
-Last consolidated: 2026-11-10, release 0.1.10. This document separates automated
+Release baseline: 1.0.0. This document separates automated
 checks from behavior that still needs evidence on the target HA installation.
 Release history belongs in the [changelog](../pi_butler/CHANGELOG.md); runtime
 constraints are described in [architecture](ARCHITECTURE.md).
@@ -53,12 +53,11 @@ Supervisor protection-mode testing.
 
 | Area | Evidence and limit |
 | --- | --- |
-| HA installation | Successful installation was reported after the 0.1.2 build correction. This does not establish acceptance of later features. |
-| Linux container baseline | [CI run 42814062685](https://github.com/stieglma/ha-pi-butler/actions/runs/42814062685) passed amd64 build/runtime and boundary checks for commit cf8d739. Later local Colima builds and full container smoke also passed before Phase 6. |
-| Release 0.1.10 local checks | 88 Python tests, 12 Node tests, metadata and whitespace checks passed. These are a dated snapshot, not a required permanent test count. |
-| Phase 6 browser checks | All five forms created/submitted/opened conversations using simulated APIs under an ingress prefix; local-time conversion and a 390px layout were checked. Disabled skills, failed catalogs and interrupted submissions have automated coverage. |
+| HA installation | Installation has succeeded on the target host. Full acceptance of the current release remains subject to the checks below. |
+| Linux container baseline | [CI run 42814062685](https://github.com/stieglma/ha-pi-butler/actions/runs/42814062685) passed amd64 build/runtime and boundary checks for commit cf8d739. Later local Colima builds and full container smoke also passed before the investigation starters were added. |
+| Investigation starter browser checks | All five forms created/submitted/opened conversations using simulated APIs under an ingress prefix; local-time conversion and a 390px layout were checked. Disabled skills, failed catalogs and interrupted submissions have automated coverage. |
 | Marketplace | Actual pinned SDK/marketplace lifecycle smoke passed locally, including plugin upgrades and user disable/removal preservation. |
-| Current live behavior | Starter launch, automation investigations and HAGHS interpretation still require target-installation evidence. The Phase 6 image was not rebuilt locally before release; no subsequent CI result is asserted here. |
+| Current live behavior | Starter launch, automation investigations and HAGHS interpretation still require target-installation evidence. The latest image and live behavior must be checked for the installed release; no subsequent CI result is asserted here. |
 
 Older experiments and superseded failures remain available in Git history. Do not
 carry an old passing build forward as proof for a newer commit or mark a live check

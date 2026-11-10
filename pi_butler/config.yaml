@@ -1,5 +1,5 @@
 name: Pi Butler
-version: 0.1.11
+version: 1.0.0
 slug: pi_butler
 description: Persistent Pi Coding Agent workspace with policy-controlled Home Assistant tools
 url: https://github.com/stieglma/ha-pi-butler

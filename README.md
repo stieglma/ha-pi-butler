@@ -1,5 +1,7 @@
 # Pi Butler
 
+<img src="pi_butler/icon.svg" alt="Pi Butler" width="128" height="128">
+
 An amd64 Home Assistant app providing Pi Coding Agent and Pi Web, an interactive
 terminal, persistent Git workspaces, and policy-controlled Home Assistant tools.
 
