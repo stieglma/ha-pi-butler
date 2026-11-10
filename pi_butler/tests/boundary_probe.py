@@ -35,4 +35,11 @@ else:
     raise AssertionError('Could become root')
 with socket.socket(socket.AF_UNIX) as connection:
     connection.connect('/run/butler/access/access.sock')
+with socket.socket(socket.AF_UNIX) as connection:
+    try:
+        connection.connect('/run/butler/admin/settings.sock')
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError('Agent can reach permission management socket')
 print('Boundary probe passed: file/process credential access denied, trusted paths protected, capabilities absent, approved socket reachable.')

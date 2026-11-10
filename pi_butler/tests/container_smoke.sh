@@ -49,7 +49,7 @@ docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
   /opt/venv/bin/python3 /tests/boundary_probe.py
 docker exec "$container_name" setpriv --reuid 1002 --regid 1002 --groups 1100 \
   --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
-  env -i PATH=/opt/venv/bin:/usr/bin:/bin /opt/venv/bin/python3 -c 'import socket; connection=socket.socket(socket.AF_UNIX); connection.connect("/run/butler/access/access.sock"); connection.close()'
+  env -i PATH=/opt/venv/bin:/usr/bin:/bin /opt/venv/bin/python3 -c 'import socket; connection=socket.socket(socket.AF_UNIX); connection.connect("/run/butler/admin/settings.sock"); connection.close()'
 test "$(docker exec "$container_name" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/)" = 403
 docker stop -t 15 "$container_name"
 test "$(docker inspect -f '{{.State.ExitCode}}' "$container_name")" = 0

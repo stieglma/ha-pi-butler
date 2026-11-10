@@ -24,32 +24,6 @@ configuration:
         name: Work branch prefix
       forge:
         name: Git hosting service
-  ha_access:
-    name: Home Assistant write permissions
-    description: Reads are always available. Writes require BOTH the master switch and a matching allow rule. Open Web UI provides searchable pickers that generate this configuration. Save here and restart to apply.
-    fields:
-      enabled:
-        name: Enable granted writes
-        description: Master switch for writes only. This is NOT allow-all. Off denies every write; on permits only supported actions matching an allow rule. Reads remain available.
-      allow:
-        name: Write grant rules
-        description: Rules combine with OR. Within one rule, nonempty entity/domain/direct-label selectors combine with AND; values within a selector combine with OR. At least one selector is required.
-        fields:
-          capability:
-            name: Capability
-            description: control permits supported ordinary controls. trigger_automation separately permits manual automation triggers.
-          entity_ids:
-            name: Entity IDs
-            description: Exact entity IDs. The native HA app form has no live entity picker; use Open Web UI to select entities and copy the generated YAML here.
-          domains:
-            name: Entity domains
-            description: Supported control domains. New matching entities inherit the grant. Combine with a label to narrow a domain grant.
-          label_ids:
-            name: Direct entity label IDs
-            description: Label IDs, not display names. Only labels assigned directly to entities count. Use Open Web UI for a searchable label picker.
-      deny_entity_ids:
-        name: Excluded entities
-        description: These entities are denied even if an allow rule matches. Use the picker in Open Web UI to avoid typing IDs.
   limits:
     name: Resource limits
     description: Operational limits for requests, logs and persistent storage; these do not grant entity access.

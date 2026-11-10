@@ -1,4 +1,4 @@
-import { categories, cleanPolicy, matchingEntities, policyYaml, validateDraft } from './policy-model.mjs';
+import { categories, cleanPolicy, matchingEntities, validateDraft, catalogWarnings } from './policy-model.mjs';
 const $ = id => document.getElementById(id);
 let catalog, draft;
 function node(tag, text, className) {
@@ -69,6 +69,8 @@ function renderRules() {
 }
 function updateOutput() {
   const errors=validateDraft(draft);
+  const warnings=[...(catalog.warning?[catalog.warning]:[]),...catalogWarnings(draft,catalog)];
+  $('draft-warnings').hidden=warnings.length===0;$('draft-warnings').textContent=warnings.join('\n');
   const granted=new Set();
   draft.allow.forEach((rule,index)=>{
     const matches=matchingEntities(rule,catalog.entities,draft.deny_entity_ids);
@@ -78,7 +80,7 @@ function updateOutput() {
   });
   $('effective').textContent=draft.enabled ? `Draft: granted writes enabled. ${granted.size} currently matching entities; only supported actions and the selected capabilities are allowed.` : 'Draft: writes disabled. No entities can be controlled, even if a rule matches. Reads remain available.';
   $('draft-errors').hidden=errors.length===0;$('draft-errors').textContent=errors.join('\n');
-  $('copy').disabled=errors.length>0;$('yaml').value=errors.length?'':policyYaml(draft);$('copied').textContent='';
+  $('save').disabled=errors.length>0;$('saved').textContent='';
 }
 async function load() {
   $('loading').hidden=false;$('load-error').hidden=true;$('retry').hidden=true;$('editor').hidden=true;
@@ -94,8 +96,17 @@ async function load() {
 }
 $('enabled').addEventListener('change',()=>{draft.enabled=$('enabled').checked;updateOutput();});
 $('add-rule').addEventListener('click',()=>{draft.allow.push({capability:'control',entity_ids:[],domains:[],label_ids:[]});renderRules();updateOutput();});
-$('copy').addEventListener('click',async()=>{
-  try {await navigator.clipboard.writeText($('yaml').value);$('copied').textContent='Copied. Save the section in HA and restart to apply.';}
-  catch { $('yaml').focus();$('yaml').select();$('copied').textContent='Select and copy this YAML, then save it in HA.'; }
+$('save').addEventListener('click',async()=>{
+  const controls=[...$('editor').querySelectorAll('input,select,button')];
+  controls.forEach(control=>{control.disabled=true;});$('saved').textContent='Saving…';
+  try {
+    const reply=await fetch('permissions',{method:'POST',headers:{'Content-Type':'application/json','X-Butler-Settings':'1'},body:JSON.stringify({policy:draft,version:catalog.version})});
+    const result=await reply.json();
+    if(!reply.ok)throw new Error(result.error||'Unable to save permissions.');
+    catalog.version=result.version;catalog.warning=null;
+    $('version').textContent=`Active policy version: ${catalog.version}.`;
+    updateOutput();$('saved').textContent='Saved. Permissions are active.';
+  } catch(error) {$('saved').textContent=error.message;}
+  finally {controls.forEach(control=>{control.disabled=false;});$('save').disabled=validateDraft(draft).length>0;}
 });
 $('retry').addEventListener('click',load);load();

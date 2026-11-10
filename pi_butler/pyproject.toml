@@ -1,6 +1,6 @@
 [project]
 name = "pi-butler"
-version = "0.1.4"
+version = "0.1.5"
 description = "Policy-controlled Home Assistant tools and persistent Pi workspace services"
 requires-python = ">=3.11"
 dependencies = [

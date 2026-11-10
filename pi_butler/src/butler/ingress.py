@@ -33,23 +33,35 @@ async def proxy(request):
         return web.FileResponse(WEB_ROOT / 'access.html', headers=PAGE_HEADERS)
     if request.path.startswith('/butler/assets/'):
         name = request.path.removeprefix('/butler/assets/')
-        if request.method != 'GET' or name not in {'access.js', 'access.css', 'policy-model.mjs'}:
+        if request.method != 'GET' or name not in {'access.js', 'access.css', 'policy-model.mjs', 'navigation.css'}:
             raise web.HTTPNotFound()
         return web.FileResponse(WEB_ROOT / name, headers={'X-Content-Type-Options': 'nosniff'})
-    if request.path == '/butler/catalog':
-        if request.method != 'GET':
-            raise web.HTTPMethodNotAllowed(request.method, ['GET'])
+    if request.path in ('/butler/catalog', '/butler/permissions'):
+        saving = request.path.endswith('/permissions')
+        expected = 'POST' if saving else 'GET'
+        if request.method != expected:
+            raise web.HTTPMethodNotAllowed(request.method, [expected])
+        if saving and (request.headers.get('X-Butler-Settings') != '1' or request.content_type != 'application/json'):
+            raise web.HTTPForbidden(text='Settings request required')
         try:
-            async with request.app[CATALOG_CLIENT].get('http://localhost/catalog') as reply:
+            payload = await request.read() if saving else None
+            if payload is not None and len(payload) > 131072:
+                raise web.HTTPRequestEntityTooLarge(max_size=131072, actual_size=len(payload))
+            async with request.app[CATALOG_CLIENT].request(expected, 'http://localhost' + ('/permissions' if saving else '/catalog'), data=payload, headers={'Content-Type': 'application/json'}) as reply:
                 body = bytearray()
                 async for chunk in reply.content.iter_chunked(65536):
                     body.extend(chunk)
                     if len(body) > 8388608:
                         raise ValueError('Catalog too large')
                 return web.Response(body=bytes(body), status=reply.status, content_type='application/json', headers={'Cache-Control': 'no-store'})
+        except web.HTTPException:
+            raise
         except Exception:
             return web.json_response({'error': 'HA picker service is unavailable; retry after the app finishes starting.'}, status=502)
     headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP and not k.lower().startswith('x-forwarded-') and k.lower() != 'forwarded'}
+    if request.method == 'GET' and request.path == '/':
+        headers = {k: v for k, v in headers.items() if k.lower() not in {'if-none-match', 'if-modified-since'}}
+        headers['Accept-Encoding'] = 'identity'
     # Preserve public Host and Origin for Pi Web's own Origin guard.
     url = 'http://127.0.0.1:8504' + request.rel_url.raw_path_qs
     client = request.app[CLIENT]
@@ -78,7 +90,17 @@ async def proxy(request):
                 await asyncio.gather(*tasks, return_exceptions=True)
             return browser
     async with client.request(request.method, url, headers=headers, data=request.content.iter_chunked(65536) if request.can_read_body else None, allow_redirects=False) as upstream:
-        response = web.StreamResponse(status=upstream.status, headers={k: v for k, v in upstream.headers.items() if k.lower() not in HOP})
+        response_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP}
+        if request.method == 'GET' and request.path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
+            body = await upstream.read()
+            navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Home Assistant access</a>'
+            body = body.replace(b'</body>', navigation + b'</body>', 1)
+            for key in list(response_headers):
+                if key.lower() in {'etag', 'last-modified'}:
+                    del response_headers[key]
+            response_headers['Cache-Control'] = 'no-store'
+            return web.Response(body=body, status=upstream.status, headers=response_headers)
+        response = web.StreamResponse(status=upstream.status, headers=response_headers)
         await response.prepare(request)
         async for chunk in upstream.content.iter_chunked(65536):
             await response.write(chunk)
@@ -89,7 +111,7 @@ async def proxy(request):
 async def main():
     app = web.Application(client_max_size=16777216)
     app[CLIENT] = ClientSession(timeout=ClientTimeout(total=None, sock_connect=10), auto_decompress=False, trust_env=False)
-    app[CATALOG_CLIENT] = ClientSession(connector=UnixConnector(path='/run/butler/access/access.sock'), timeout=ClientTimeout(total=30), trust_env=False)
+    app[CATALOG_CLIENT] = ClientSession(connector=UnixConnector(path='/run/butler/admin/settings.sock'), timeout=ClientTimeout(total=30), trust_env=False)
     app.router.add_route('*', '/{path:.*}', proxy)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()

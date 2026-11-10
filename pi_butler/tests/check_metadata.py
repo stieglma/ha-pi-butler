@@ -11,7 +11,7 @@ assert config['ingress'] and config['homeassistant_api']
 assert config['hassio_role'] == 'homeassistant'
 assert not config.get('host_network') and not config.get('privileged') and not config.get('map')
 assert not config.get('ports')
-assert config['options']['ha_access'] == {'enabled': False, 'allow': [], 'deny_entity_ids': []}
+assert 'ha_access' not in config['options'] and 'ha_access' not in config['schema']
 assert set(config['options']) == set(config['schema'])
 for key in config['options']:
     assert set(config['options'][key]) == set(config['schema'][key])
@@ -26,8 +26,5 @@ for language in ('en', 'de'):
     for section, definition in config['schema'].items():
         fields = translated[section]['fields']
         assert set(fields) == set(definition)
-    grants = translated['ha_access']['fields']['allow']['fields']
-    assert set(grants) == set(config['schema']['ha_access']['allow'][0])
-    assert translated['ha_access']['fields']['enabled']['description']
-assert config['ingress_entry'] == 'butler/'
+assert config['ingress_entry'] == '/'
 print('HA metadata, translations and bundled package pins passed')

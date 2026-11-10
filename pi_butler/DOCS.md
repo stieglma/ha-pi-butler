@@ -9,9 +9,9 @@ For a local checkout, copy the `pi_butler` directory into HA's local apps direct
 reload the app store and install the local app. Do not copy it into the live Core
 configuration directory. This repository does not publish a prebuilt image yet.
 
-Open Web UI now opens Pi Butler’s permission builder, with a prominent link to
-Pi Web. The builder loads live entity and direct-label choices and generates YAML
-for the app Configuration tab. Pi Web starts without a configured Git repository
+Open Web UI opens Pi Web directly. Its persistent **Home Assistant access** link
+opens the permission settings in a separate tab, with live entity and direct-label
+choices and a **Save and apply** button. Pi Web starts without a configured Git repository
 or model login. Add
 `/data/workspaces/scratch` as a project for HA investigations, or
 `/data/workspaces/repository` after successful repository setup. Project registration
@@ -203,52 +203,34 @@ Broad reads are always available: states, runtime config, installed services,
 entity/device/area/label registries, history, calendar events, and Core/app logs.
 No secret auth storage or arbitrary host/configuration-file reads are exposed.
 
-`ha_access.enabled` is a master switch for runtime writes, not an allow-all flag.
-Turning it off suspends every grant without deleting the allow list. Turning it
-on still requires a matching rule and supported capability. Reads are unaffected.
+Open Pi Butler to enter Pi Web directly. The persistent **Home Assistant access**
+link opens a separate settings tab at `butler/`, available whenever permissions
+need to change. HA's app Configuration page contains repository settings and
+resource limits only.
 
-HA's native app configuration schema supports static choice lists, but no live
-entity or label selectors. The native domains field now offers a dropdown for
-supported domains. English and German field labels/descriptions explain every
-permission field. For live searchable entity/label/exclusion choices:
+1. Open **Home Assistant access** from Pi Web.
+2. Add rules and choose entities, domains and directly assigned labels using
+   searchable pickers. Check the matching-entity previews and master switch.
+3. Select **Save and apply**. Permissions take effect immediately without a restart.
 
-1. Select **Open Web UI** to open the permission builder.
-2. Add rules and choose their entities, domains and directly assigned labels.
-   Check the matching-entity previews and the master switch.
-3. Copy the generated `ha_access` YAML. In HA’s app Configuration tab, choose
-   **Edit in YAML**, replace only `ha_access`, and keep `repository` and `limits`.
-4. Save and restart the app. Reopen the builder to confirm the active policy.
+The master switch suspends every write grant without deleting rules. Enabling
+it still requires a matching rule and supported capability. Reads are unaffected.
+New explicit entity IDs are checked against HA before saving. Missing previously
+configured IDs show warnings and remain preserved, including exclusions. Domain
+and label grants may match entities added later.
 
-The builder cannot save settings or modify the service policy. Its catalog API
-is read-only and ingress-authenticated; it contains IDs, display names, direct
-labels and the current policy, with the same request/byte limits as other reads.
-This keeps changes to the agent's authority under trusted HA configuration.
-Preview membership reflects current states and direct labels; actions still use
-the service's current registry resolution and operation catalog. Label/domain
-grants can match newly added entities later. Stale configured IDs are preserved
-and marked missing rather than silently removed.
+Permissions persist privately in `/data/service/permissions.json`. Existing HA
+`ha_access` settings migrate automatically on the first upgraded startup, using
+the previous service options when HA has already removed the legacy fields.
+Malformed imported permissions disable writes and show a recovery notice instead
+of preventing startup; the original is retained in `permissions-import.json`.
 
-Writes default to denied. Example options (merge this section into the complete
-app options; do not discard `repository` and `limits`):
+The settings endpoint requires HA ingress and a browser request header. It uses
+a separate Unix socket accessible only to the ingress and access service users.
+The Pi/MCP socket exposes tools only and cannot save permissions. Permission
+updates use atomic writes and reject stale page versions. Saves wait for ongoing
+write operations before applying the new policy.
 
-```yaml
-ha_access:
-  enabled: true
-  allow:
-    - capability: control
-      entity_ids: [calendar.family]
-      domains: []
-      label_ids: []
-    - capability: control
-      entity_ids: []
-      domains: [light]
-      label_ids: [pi_butler_writable]
-    - capability: trigger_automation
-      entity_ids: [automation.evening_routine]
-      domains: []
-      label_ids: []
-  deny_entity_ids: [light.nursery]
-```
 
 Rules combine with OR. Nonempty selector lists within a rule combine with AND;
 values within a list combine with OR. At least one selector must be nonempty.
@@ -280,7 +262,9 @@ integration. Scripts, scenes, generic service forwarding, templates and events
 are excluded. Indirect effects through existing HA automations are accepted.
 
 Use the read-only `access_summary` MCP tool to inspect policy/version and matched
-entities; tools with list results support offset/limit. Pi user MCP configuration
+entities with write grants; an empty list means no write grants, not missing read
+access. Use `states` with `domain: light` or `domain: calendar` to discover readable
+entities. Tools with list results support offset/limit. Pi user MCP configuration
 is `/data/pi/mcp.json`, with server `pi_butler`. `pi mcp list` diagnoses its state.
 Changing client MCP configuration cannot change the trusted service policy.
 

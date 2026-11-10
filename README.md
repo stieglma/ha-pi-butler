@@ -10,7 +10,8 @@ Add `https://github.com/stieglma/ha-pi-butler` as a repository in Home Assistant
 app store, install Pi Butler, keep protection mode enabled, and select Open Web UI.
 The image builds locally on HA; the initial build downloads the pinned tools and
 compiles the terminal dependency. No repository or provider login is needed to
-open the UI. The entry page provides permission pickers and a link to Pi Web.
+open the UI. Pi Web opens directly, with a persistent Home Assistant access link to separate
+permission settings. Changes there save and apply immediately.
 Use an HA administrator account: Pi Butler is one shared privileged
 workspace, not a separate workspace per HA user.
 

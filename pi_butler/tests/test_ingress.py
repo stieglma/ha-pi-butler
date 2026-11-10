@@ -25,6 +25,8 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
         backend = web.Application()
         received = []
         async def echo(request):
+            if request.path == '/':
+                return web.Response(text='<html><body><div id="root">Pi Web</div></body></html>', content_type='text/html', headers={'ETag': 'original'})
             received.append((request.path_qs, request.headers.get('Host'), request.headers.get('Origin')))
             if request.headers.get('Upgrade', '').lower() == 'websocket':
                 ws = web.WebSocketResponse()
@@ -57,6 +59,11 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
         headers = {'Host': 'ha.example:8123', 'Origin': 'https://ha.example:8123'}
         try:
             with patch('butler.ingress.INGRESS_PEER', '127.0.0.1'):
+                async with session.get(front_url + '/', headers=headers) as response:
+                    body = await response.text()
+                    self.assertIn('Pi Web', body)
+                    self.assertIn('href="butler/" target="_blank"', body)
+                    self.assertNotIn('ETag', response.headers)
                 async with session.get(front_url + '/api/test?q=1', headers=headers) as response:
                     self.assertEqual(response.status, 200)
                     self.assertEqual(await response.text(), 'proxied')
@@ -88,4 +95,12 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
         req.path = '/butler/catalog'
         req.method = 'POST'
         with self.assertRaises(web.HTTPMethodNotAllowed):
+            await proxy(req)
+        req.path = '/butler/permissions'
+        req.method = 'GET'
+        with self.assertRaises(web.HTTPMethodNotAllowed):
+            await proxy(req)
+        req.method = 'POST'
+        req.headers = {}
+        with self.assertRaises(web.HTTPForbidden):
             await proxy(req)

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cleanPolicy, matchingEntities, policyYaml, validateDraft} from '../src/butler/web/policy-model.mjs';
+import {cleanPolicy, matchingEntities, policyYaml, validateDraft, catalogWarnings} from '../src/butler/web/policy-model.mjs';
 const entities = [
   {id:'light.office', label_ids:['writable']},
   {id:'light.nursery', label_ids:['writable']},
@@ -32,4 +32,21 @@ test('draft cloning preserves the active policy and unknown configured IDs',()=>
 });
 test('default-deny export is explicit and stable',()=>{
   assert.equal(policyYaml(cleanPolicy({enabled:false,allow:[]})), 'ha_access:\n  enabled: false\n  allow: []\n  deny_entity_ids: []\n');
+});
+test('malformed grant and exclusion IDs prevent YAML export',()=>{
+  for (const id of ['office', 'Light.office', 'light.office extra', 'light.']) {
+    for (const excluded of [false, true]) {
+      const draft=cleanPolicy({enabled:true,allow:[{capability:'control',entity_ids:[excluded?'light.office':id]}],deny_entity_ids:excluded?[id]:[]});
+      assert.ok(validateDraft(draft).some(error=>error.includes('entity ID')));
+      assert.throws(()=>policyYaml(draft));
+    }
+  }
+});
+test('unknown IDs warn without dropping grants or exclusions',()=>{
+  const draft=cleanPolicy({enabled:true,allow:[{capability:'control',entity_ids:['light.office','light.typo']}],deny_entity_ids:['light.removed']});
+  const warnings=catalogWarnings(draft,{entities});
+  assert.equal(warnings.length,2);
+  assert.match(warnings[0],/light.typo/);
+  assert.match(warnings[1],/light.removed/);
+  assert.match(policyYaml(draft),/light.removed/);
 });

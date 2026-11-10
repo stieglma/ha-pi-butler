@@ -17,9 +17,20 @@ export function validateDraft(policy) {
     if (!['control', 'trigger_automation'].includes(rule.capability)) errors.push(`Rule ${index+1}: unknown capability.`);
     if (!categories.some(key => rule[key].length)) errors.push(`Rule ${index+1}: choose at least one entity, domain or label.`);
     for (const key of categories) if (rule[key].length > 256) errors.push(`Rule ${index+1}: ${key} has more than 256 values.`);
+    for (const id of rule.entity_ids) if (!/^[a-z0-9_]+\.[a-z0-9_]+$/.test(id)) errors.push(`Rule ${index+1}: invalid entity ID "${id}". Use domain.object_id.`);
   });
   if (policy.deny_entity_ids.length > 256) errors.push('Use at most 256 excluded entities.');
+  for (const id of policy.deny_entity_ids) if (!/^[a-z0-9_]+\.[a-z0-9_]+$/.test(id)) errors.push(`Invalid excluded entity ID "${id}". Use domain.object_id.`);
   return errors;
+}
+export function catalogWarnings(policy, catalog) {
+  const known = new Set(catalog.entities.map(entity => entity.id));
+  const warnings = [];
+  policy.allow.forEach((rule, index) => {
+    for (const id of rule.entity_ids) if (!known.has(id)) warnings.push(`Rule ${index+1}: entity "${id}" was not found in the current supported HA entities. Check for a typo, a renamed entity or an entity that is currently unavailable.`);
+  });
+  for (const id of policy.deny_entity_ids) if (!known.has(id)) warnings.push(`Excluded entity "${id}" was not found in the current supported HA entities. The exclusion is preserved.`);
+  return warnings;
 }
 export function matchingEntities(rule, entities, deny = []) {
   if (!categories.some(key => rule[key].length)) return [];

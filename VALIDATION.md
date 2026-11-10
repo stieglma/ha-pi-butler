@@ -171,3 +171,20 @@ domain and label selection, exclusion precedence, rule deletion, rejection of
 empty rules and a 390px mobile layout. Catalog data came from a fake HA backend;
 actual Supervisor/Core catalog retrieval and German form rendering remain to be
 checked in HA. CI includes translation coverage and browser-model tests.
+
+## Separate access settings and direct saves
+
+The current implementation supersedes the read-only permission builder described
+above. Pi Web is the ingress landing page; a persistent link opens `butler/` in a
+separate tab. Permissions save atomically and apply immediately through a separate
+management socket. Existing HA options migrate to private permission storage.
+The agent's socket has no catalog or permission-saving routes.
+
+Local validation: 63 Python tests, 7 JavaScript tests, metadata checks and Python
+compilation pass. Coverage includes migration, malformed imports, stale saves,
+unknown IDs, disk-write failure, persistence, management-route separation and
+navigation injection. Browser automation with fake HA/Pi backends verified the
+separate tab, save confirmation and persistence after reloading the settings page.
+Docker is unavailable in this local environment, so the updated Linux identity
+and socket boundary smoke checks still need CI. Real HA ingress and the actual
+Pi Web interface still need integration validation.

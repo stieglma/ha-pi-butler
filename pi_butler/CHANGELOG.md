@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.5 — separate access settings and immediate permission updates
+
+- Open Pi Web directly, with a persistent Home Assistant access link opening
+  permissions in a separate tab.
+- Move permission editing out of HA's static app form. Save and apply validated
+  permissions immediately through an ingress-only management socket, isolated
+  from the agent. Migrate existing grants and keep malformed imports recoverable.
+- Clarify that MCP reads are always available and an empty access summary only
+  means no write grants. Add discovery guidance to existing and new Pi instructions
+  at app startup while preserving user customizations.
+
 ## 0.1.4 — terminal and MCP startup fixes
 
 - Expose Pi in `/usr/local/bin` so it remains available when login shells reset PATH.

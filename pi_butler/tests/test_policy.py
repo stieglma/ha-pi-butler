@@ -35,6 +35,22 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(p.permits('light.office', 'control', self.registry))
         self.assertFalse(p.permits('light.nursery', 'control', self.registry))
 
+    def test_calendar_label_grant_without_entity_selector(self):
+        registry = {'calendar.family': {'labels': ['ai_controllable']},
+                    'calendar.work': {'labels': []},
+                    'light.office': {'labels': ['ai_controllable']}}
+        for entities in ({}, {'entity_ids': []}):
+            with self.subTest(entities=entities):
+                p = policy([rule(domains=['calendar'], label_ids=['ai_controllable'], **entities)])
+                self.assertTrue(p.permits('calendar.family', 'control', registry))
+                self.assertFalse(p.permits('calendar.work', 'control', registry))
+                self.assertFalse(p.permits('light.office', 'control', registry))
+
+    def test_grant_requires_at_least_one_nonempty_selector(self):
+        for selectors in ({}, {'entity_ids': [], 'domains': [], 'label_ids': []}):
+            with self.subTest(selectors=selectors), self.assertRaises(Rejected):
+                policy([rule(**selectors)])
+
     def test_denial_prevents_entire_batch(self):
         p = policy([rule(domains=['light'])], deny=['light.nursery'])
         with self.assertRaises(Rejected):
