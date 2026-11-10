@@ -171,7 +171,7 @@ def main():
     spawn('access', [sys.executable, '-m', 'butler.access'], ACCESS, SHARED, [SHARED], service_env)
     spawn('sessiond', ['pi-web-sessiond'], PI, PI, [SHARED], pi_env)
     spawn('web', ['pi-web-server'], PI, PI, [SHARED], pi_env)
-    spawn('ingress', [sys.executable, '-m', 'butler.ingress'], INGRESS, INGRESS, [],
+    spawn('ingress', [sys.executable, '-m', 'butler.ingress'], INGRESS, INGRESS, [SHARED],
           {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': '/opt/butler', 'LANG': 'C.UTF-8'})
     spawn('repository', ['butler-workspace', 'setup'], PI, PI, [SHARED], pi_env, essential=False)
     spawn('maintenance', [sys.executable, '-m', 'butler.maintenance'], PI, PI, [SHARED], pi_env)

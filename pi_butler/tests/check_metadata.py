@@ -21,4 +21,13 @@ assert len(manifest['piButler']['packages']) == len(set(manifest['piButler']['pa
 for name in manifest['piButler']['packages']:
     assert manifest['dependencies'][name] == lock['packages']['node_modules/' + name]['version']
 assert 'node_modules/pi-mcp-adapter' not in lock['packages']
-print('HA metadata and bundled package pins passed')
+for language in ('en', 'de'):
+    translated = yaml.safe_load((root / 'translations' / (language + '.yaml')).read_text())['configuration']
+    for section, definition in config['schema'].items():
+        fields = translated[section]['fields']
+        assert set(fields) == set(definition)
+    grants = translated['ha_access']['fields']['allow']['fields']
+    assert set(grants) == set(config['schema']['ha_access']['allow'][0])
+    assert translated['ha_access']['fields']['enabled']['description']
+assert config['ingress_entry'] == 'butler/'
+print('HA metadata, translations and bundled package pins passed')

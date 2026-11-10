@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pi Butler · Home Assistant access</title>
+<link rel="stylesheet" href="assets/access.css">
+<script type="module" src="assets/access.js"></script>
+</head>
+<body>
+<header><a class="brand" href="./">Pi Butler</a><a class="primary" href="../">Open Pi Web →</a></header>
+<main>
+<div class="intro"><p class="eyebrow">HOME ASSISTANT ACCESS</p><h1>Choose what Pi may control.</h1>
+<p>Build grant rules using your Home Assistant entities and labels. Reading Home Assistant is always available.</p></div>
+<div id="loading" role="status">Loading entities, labels and the active configuration…</div>
+<div id="load-error" class="error" role="alert" hidden></div><button id="retry" hidden>Retry loading</button>
+<div id="editor" hidden>
+<section aria-labelledby="master-title"><div class="switch-row"><div><h2 id="master-title">Allow granted writes</h2><p>Writes need this switch <strong>and</strong> a matching grant below. This never grants access to everything.</p></div><label class="toggle"><input id="enabled" type="checkbox"><span>Enable writes</span></label></div>
+<p id="effective" class="notice"></p><p class="muted">Changes here are a draft. The running app uses the configuration saved in HA. <span id="version"></span></p></section>
+<section aria-labelledby="rules-title"><div class="section-heading"><h2 id="rules-title">Grant rules</h2><button id="add-rule">+ Add rule</button></div>
+<p>Any matching rule grants its capability. Within one rule, the entity, domain and label filters must <strong>all</strong> match. Choose multiple values within a filter to match <strong>any</strong> of them.</p>
+<p class="muted">Labels count only when assigned directly to an entity. Automation triggering has its own capability.</p>
+<div id="rules"></div><p id="no-rules" class="notice">No grant rules. All runtime writes are denied.</p></section>
+<section aria-labelledby="deny-title"><h2 id="deny-title">Always exclude</h2><p>These entities stay denied even when a grant matches.</p><div id="exclusions"></div></section>
+<section aria-labelledby="apply-title"><h2 id="apply-title">Apply in Home Assistant</h2><ol><li>Review the generated configuration below.</li><li>Open the app’s <strong>Configuration</strong> tab → menu → <strong>Edit in YAML</strong>. Replace only the <code>ha_access</code> section; keep <code>repository</code> and <code>limits</code>.</li><li>Save and restart Pi Butler. Reopen this page to confirm the active configuration.</li></ol>
+<div id="draft-errors" class="error" role="alert" hidden></div><label for="yaml">Generated ha_access section</label><textarea id="yaml" rows="14" readonly spellcheck="false"></textarea>
+<div class="actions"><button id="copy" class="primary">Copy YAML</button><span id="copied" role="status"></span></div>
+<p class="muted">This page cannot change permissions itself. HA remains the authority for saved grants.</p></section>
+</div>
+<footer>Model providers and Git login are configured in <a href="../">Pi Web</a>. <a href="status">Repository status</a>.</footer>
+</main>
+</body></html>

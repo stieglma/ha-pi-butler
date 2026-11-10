@@ -122,3 +122,13 @@ file remembers defaults offered so user removal persists; new image defaults
 are seeded once. Node 24.15.0 satisfies the marketplace engine requirement.
 The extension loader is bundled; actual custom marketplace/skill content remains
 to be defined. Native HA MCP remains separate from optional marketplace MCP.
+
+## Permission configuration UX (0.1.3)
+
+HA app options support static lists, not dynamic entity/label selectors. Native
+fields receive English/German labels/descriptions and a supported-domain dropdown.
+The ingress entry is a read-only permission builder that fetches a bounded live
+catalog via the protected service socket, selects entities/direct labels, previews
+rules and exports ha_access YAML. Users save it in HA app options and restart;
+no HTTP/MCP operation can change policy. Ingress joins the socket client group
+but still receives no upstream credential and cannot read service storage.

@@ -151,3 +151,23 @@ completed successfully for commit cf8d739 on 2026-11-10. Both jobs passed:
 This replaces the earlier unexecuted Docker/CI status. Actual HA protection-mode
 behavior, real Supervisor/Core APIs, ingress browser/terminal interactions,
 authentication/delivery and backup/restore checks remain pending.
+
+## Permission UX and installation feedback (0.1.3)
+
+Thomas confirmed successful HA installation after the 0.1.2 build fix. HA's
+native app form offers no dynamic entity/label selector (its schema exposes
+static list choices and host devices); added domain dropdowns and English/German
+field descriptions, including explicit write-switch semantics.
+
+The ingress permission builder uses a read-only bounded entity/label catalog,
+previews draft rules and exports YAML for trusted HA app configuration. It has
+no endpoint for saving grants. The ingress identity can connect to the approved
+service socket but cannot read its credential or storage.
+
+Local checks: 53 Python tests and 5 JavaScript model tests pass. A Python/JS
+roundtrip test checks that generated YAML and rule previews agree with the
+trusted policy evaluator. Browser automation exercised entity search/selection,
+domain and label selection, exclusion precedence, rule deletion, rejection of
+empty rules and a 390px mobile layout. Catalog data came from a fake HA backend;
+actual Supervisor/Core catalog retrieval and German form rendering remain to be
+checked in HA. CI includes translation coverage and browser-model tests.

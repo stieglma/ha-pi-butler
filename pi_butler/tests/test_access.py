@@ -17,6 +17,8 @@ class FakeHA:
         self.registry = [{'entity_id': 'light.yes', 'labels': []}, {'entity_id': 'light.no', 'labels': []}]
 
     async def ws(self, command):
+        if command == REGISTRIES['labels']:
+            return [{'label_id': 'writable', 'name': 'Pi writable'}]
         return self.registry
 
     async def rest(self, path, **kwargs):
@@ -94,3 +96,21 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('abc.def', json.dumps(value))
         self.assertNotIn('xyz', json.dumps(value))
         self.assertNotIn('known-secret', json.dumps(value))
+
+    async def test_picker_catalog_is_read_only_and_omits_attributes(self):
+        self.ha.registry[0]['labels'] = ['writable']
+        result = await self.access.catalog()
+        self.assertEqual(result['labels'], [{'id': 'writable', 'name': 'Pi writable'}])
+        self.assertEqual(result['entities'][1]['label_ids'], ['writable'])
+        self.assertEqual(result['policy'], OPTIONS['ha_access'])
+        self.assertNotIn(self.ha.token, json.dumps(result))
+        self.assertNotIn('attributes', json.dumps(result))
+        self.assertEqual(self.ha.actions, [])
+
+    async def test_picker_catalog_failure_does_not_change_policy(self):
+        before = json.dumps(self.access.policy.config, sort_keys=True)
+        self.ha.ws = AsyncMock(side_effect=RuntimeError('unavailable'))
+        with self.assertRaises(RuntimeError):
+            await self.access.catalog()
+        self.assertEqual(json.dumps(self.access.policy.config, sort_keys=True), before)
+        self.assertFalse(self.ha.actions)

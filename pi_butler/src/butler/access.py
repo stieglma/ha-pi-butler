@@ -162,6 +162,29 @@ class Access:
                 raise Rejected('Tool result exceeds byte limit; narrow query or page size')
             return result
 
+    async def catalog(self):
+        """Read-only picker data. No endpoint applies policy or edits app options."""
+        async with self.semaphore, asyncio.timeout(25):
+            states, registry = await self.snapshot()
+            labels = await self.upstream.ws(REGISTRIES['labels'])
+            domains = ['light', 'switch', 'input_boolean', 'calendar', 'automation']
+            entities = []
+            for state in states:
+                entity_id = state['entity_id']
+                if entity_id.split('.')[0] not in domains:
+                    continue
+                entry = registry.get(entity_id, {})
+                entities.append({'id': entity_id,
+                                 'name': state.get('attributes', {}).get('friendly_name') or entry.get('name') or entry.get('original_name') or entity_id,
+                                 'label_ids': entry.get('labels', [])})
+            result = {'policy': self.policy.config, 'version': self.policy.version,
+                      'domains': domains, 'entities': sorted(entities, key=lambda e: e['id']),
+                      'labels': sorted([{'id': label['label_id'], 'name': label.get('name') or label['label_id']} for label in labels], key=lambda label: label['id'])}
+            result = redact(result, self.upstream.token)
+            if len(json.dumps(result).encode()) > self.limits['response_bytes']:
+                raise Rejected('Picker catalog exceeds byte limit; increase response_bytes in app configuration')
+            return result
+
     async def execute(self, name, args):
         api = self.upstream
         if name == 'states':
@@ -249,8 +272,17 @@ async def serve():
             # Never send upstream bodies, credentials, or tracebacks to pi.
             return web.json_response({'error': 'HA request failed or timed out'}, status=502)
 
+    async def catalog(req):
+        try:
+            return web.json_response(await access.catalog(), headers={'Cache-Control': 'no-store'})
+        except Rejected as exc:
+            return web.json_response({'error': str(exc)}, status=400)
+        except Exception:
+            return web.json_response({'error': 'Could not load HA entities and labels; check service connectivity and retry.'}, status=502)
+
     app = web.Application(client_max_size=32768)
     app.router.add_post('/call', request)
+    app.router.add_get('/catalog', catalog)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     path = '/run/butler/access/access.sock'

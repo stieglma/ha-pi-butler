@@ -1,0 +1,67 @@
+configuration:
+  repository:
+    name: Konfigurations-Repository
+    description: Optionaler, unabhängiger Git-Checkout. Anmeldung im Pi-Web-Terminal. Nach Änderungen die App neu starten.
+    fields:
+      url:
+        name: Repository-URL
+        description: Leer lassen, um Pi Butler ohne Repository zu nutzen. SSH oder HTTPS ohne eingebettete Zugangsdaten verwenden.
+      checkout_branch:
+        name: Branch für den ersten Checkout
+        description: Vorhandener Remote-Branch für die Ersteinrichtung. Bestehende Arbeit wird nicht automatisch zurückgesetzt oder umgeschaltet.
+      author_name:
+        name: Git-Autorenname
+      author_email:
+        name: Git-Autoren-E-Mail
+      delivery:
+        name: Bereitstellungsmodus
+        description: push überträgt in den Ziel-Branch; pull_request erstellt einen PR oder MR zum Basis-Branch.
+      destination_branch:
+        name: Ziel-Branch für Push
+      base_branch:
+        name: Basis-Branch für PR / MR
+      work_branch_prefix:
+        name: Präfix für Arbeits-Branches
+      forge:
+        name: Git-Hosting-Dienst
+  ha_access:
+    name: Home-Assistant-Schreibrechte
+    description: Lesen ist immer möglich. Schreiben erfordert SOWOHL den Hauptschalter ALS AUCH eine passende Freigaberegel. Unter Weboberfläche öffnen gibt es eine durchsuchbare Auswahl, die diese Konfiguration erzeugt. Hier speichern und zum Anwenden neu starten.
+    fields:
+      enabled:
+        name: Freigegebene Schreibzugriffe aktivieren
+        description: Hauptschalter nur für Schreibzugriffe. KEINE Alles-erlauben-Option. Aus sperrt alle Schreibzugriffe; Ein erlaubt nur unterstützte Aktionen mit passender Freigaberegel. Lesen bleibt möglich.
+      allow:
+        name: Freigaberegeln
+        description: Regeln sind ODER-verknüpft. Innerhalb einer Regel sind nichtleere Entitäts-, Domain- und direkte Label-Filter UND-verknüpft; Werte innerhalb eines Filters ODER-verknüpft. Mindestens ein Filter ist erforderlich.
+        fields:
+          capability:
+            name: Berechtigung
+            description: control erlaubt unterstützte normale Steuerung. trigger_automation erlaubt separat das manuelle Auslösen von Automationen.
+          entity_ids:
+            name: Entitäts-IDs
+            description: Exakte Entitäts-IDs. Das native HA-App-Formular hat keine dynamische Entitätsauswahl; unter Weboberfläche öffnen auswählen und das erzeugte YAML hier einfügen.
+          domains:
+            name: Entitäts-Domains
+            description: Unterstützte Steuerungs-Domains. Neue passende Entitäten erben die Freigabe. Mit einem Label kombinieren, um eine Domain-Freigabe einzuschränken.
+          label_ids:
+            name: IDs direkt zugewiesener Labels
+            description: Label-IDs, keine Anzeigenamen. Es zählen nur direkt an Entitäten vergebene Labels. Unter Weboberfläche öffnen gibt es eine durchsuchbare Auswahl.
+      deny_entity_ids:
+        name: Ausgeschlossene Entitäten
+        description: Diese Entitäten bleiben trotz passender Freigaberegel gesperrt. Die Auswahl in der Weboberfläche vermeidet das manuelle Eingeben von IDs.
+  limits:
+    name: Ressourcenlimits
+    description: Betriebsgrenzen für Anfragen, Protokolle und persistenten Speicher. Diese Einstellungen vergeben keine Entitätsrechte.
+    fields:
+      parallel_requests:
+        name: Gleichzeitige HA-Anfragen
+      response_bytes:
+        name: Maximale Antwortgröße in Bytes
+      log_lines:
+        name: Maximale Anzahl Diagnosezeilen
+      retention_days:
+        name: Diagnoseaufbewahrung in Tagen
+      storage_megabytes:
+        name: Speicherschwelle in MiB
+        description: Bei Überschreitung wird die App bei der nächsten regelmäßigen Prüfung angehalten. Bestehende Arbeit und Sitzungen bleiben erhalten.

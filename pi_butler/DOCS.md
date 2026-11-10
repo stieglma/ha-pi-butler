@@ -9,10 +9,13 @@ For a local checkout, copy the `pi_butler` directory into HA's local apps direct
 reload the app store and install the local app. Do not copy it into the live Core
 configuration directory. This repository does not publish a prebuilt image yet.
 
-Pi Web starts without a configured Git repository or model login. Add
+Open Web UI now opens Pi Butler’s permission builder, with a prominent link to
+Pi Web. The builder loads live entity and direct-label choices and generates YAML
+for the app Configuration tab. Pi Web starts without a configured Git repository
+or model login. Add
 `/data/workspaces/scratch` as a project for HA investigations, or
 `/data/workspaces/repository` after successful repository setup. Project registration
-uses the existing Pi Web UI. The optional setup page is at `butler/` relative to
+uses the existing Pi Web UI. The permission builder is at `butler/` relative to
 the app's ingress root; repository status is at `butler/status`.
 
 Pi Web sessions are server-side. Disconnecting the browser should leave work
@@ -199,6 +202,31 @@ to that branch may deploy automatically through that app.
 Broad reads are always available: states, runtime config, installed services,
 entity/device/area/label registries, history, calendar events, and Core/app logs.
 No secret auth storage or arbitrary host/configuration-file reads are exposed.
+
+`ha_access.enabled` is a master switch for runtime writes, not an allow-all flag.
+Turning it off suspends every grant without deleting the allow list. Turning it
+on still requires a matching rule and supported capability. Reads are unaffected.
+
+HA's native app configuration schema supports static choice lists, but no live
+entity or label selectors. The native domains field now offers a dropdown for
+supported domains. English and German field labels/descriptions explain every
+permission field. For live searchable entity/label/exclusion choices:
+
+1. Select **Open Web UI** to open the permission builder.
+2. Add rules and choose their entities, domains and directly assigned labels.
+   Check the matching-entity previews and the master switch.
+3. Copy the generated `ha_access` YAML. In HA’s app Configuration tab, choose
+   **Edit in YAML**, replace only `ha_access`, and keep `repository` and `limits`.
+4. Save and restart the app. Reopen the builder to confirm the active policy.
+
+The builder cannot save settings or modify the service policy. Its catalog API
+is read-only and ingress-authenticated; it contains IDs, display names, direct
+labels and the current policy, with the same request/byte limits as other reads.
+This keeps changes to the agent's authority under trusted HA configuration.
+Preview membership reflects current states and direct labels; actions still use
+the service's current registry resolution and operation catalog. Label/domain
+grants can match newly added entities later. Stale configured IDs are preserved
+and marked missing rather than silently removed.
 
 Writes default to denied. Example options (merge this section into the complete
 app options; do not discard `repository` and `limits`):

@@ -1,0 +1,67 @@
+configuration:
+  repository:
+    name: Configuration repository
+    description: Optional independent Git checkout. Authenticate in the Pi Web terminal. Restart the app after changes.
+    fields:
+      url:
+        name: Repository URL
+        description: Leave empty to use Pi Butler without a repository. Use SSH or HTTPS without embedded credentials.
+      checkout_branch:
+        name: Initial checkout branch
+        description: Existing remote branch cloned during first setup. Existing work is never reset or switched automatically.
+      author_name:
+        name: Git author name
+      author_email:
+        name: Git author email
+      delivery:
+        name: Delivery mode
+        description: push delivers to the destination branch; pull_request creates a PR or MR against the base branch.
+      destination_branch:
+        name: Push destination branch
+      base_branch:
+        name: PR / MR base branch
+      work_branch_prefix:
+        name: Work branch prefix
+      forge:
+        name: Git hosting service
+  ha_access:
+    name: Home Assistant write permissions
+    description: Reads are always available. Writes require BOTH the master switch and a matching allow rule. Open Web UI provides searchable pickers that generate this configuration. Save here and restart to apply.
+    fields:
+      enabled:
+        name: Enable granted writes
+        description: Master switch for writes only. This is NOT allow-all. Off denies every write; on permits only supported actions matching an allow rule. Reads remain available.
+      allow:
+        name: Write grant rules
+        description: Rules combine with OR. Within one rule, nonempty entity/domain/direct-label selectors combine with AND; values within a selector combine with OR. At least one selector is required.
+        fields:
+          capability:
+            name: Capability
+            description: control permits supported ordinary controls. trigger_automation separately permits manual automation triggers.
+          entity_ids:
+            name: Entity IDs
+            description: Exact entity IDs. The native HA app form has no live entity picker; use Open Web UI to select entities and copy the generated YAML here.
+          domains:
+            name: Entity domains
+            description: Supported control domains. New matching entities inherit the grant. Combine with a label to narrow a domain grant.
+          label_ids:
+            name: Direct entity label IDs
+            description: Label IDs, not display names. Only labels assigned directly to entities count. Use Open Web UI for a searchable label picker.
+      deny_entity_ids:
+        name: Excluded entities
+        description: These entities are denied even if an allow rule matches. Use the picker in Open Web UI to avoid typing IDs.
+  limits:
+    name: Resource limits
+    description: Operational limits for requests, logs and persistent storage; these do not grant entity access.
+    fields:
+      parallel_requests:
+        name: Concurrent HA requests
+      response_bytes:
+        name: Maximum response bytes
+      log_lines:
+        name: Maximum diagnostic log lines
+      retention_days:
+        name: Diagnostic retention in days
+      storage_megabytes:
+        name: Persistent storage threshold in MiB
+        description: Stops the app on the next periodic check when exceeded. Existing work and sessions are preserved.

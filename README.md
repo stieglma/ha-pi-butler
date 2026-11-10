@@ -3,14 +3,15 @@
 An amd64 Home Assistant app providing Pi Coding Agent and Pi Web, an interactive
 terminal, persistent Git workspaces, and policy-controlled Home Assistant tools.
 
-The first implementation is ready for container/HA integration testing. It has
-**not yet been installed or validated in Home Assistant**. See [validation](VALIDATION.md).
+HA installation and Linux container checks have passed. Runtime integration
+validation in Home Assistant is ongoing. See [validation](VALIDATION.md).
 
 Add `https://github.com/stieglma/ha-pi-butler` as a repository in Home Assistant's
 app store, install Pi Butler, keep protection mode enabled, and select Open Web UI.
 The image builds locally on HA; the initial build downloads the pinned tools and
 compiles the terminal dependency. No repository or provider login is needed to
-open the UI. Use an HA administrator account: Pi Butler is one shared privileged
+open the UI. The entry page provides permission pickers and a link to Pi Web.
+Use an HA administrator account: Pi Butler is one shared privileged
 workspace, not a separate workspace per HA user.
 
 Configure a model provider using Pi Web's existing settings/login flow. Configure

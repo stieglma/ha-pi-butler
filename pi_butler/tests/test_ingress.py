@@ -69,3 +69,23 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
             await front_runner.cleanup()
             await back_runner.cleanup()
             await session.close()
+
+    async def test_picker_page_assets_and_method_boundary(self):
+        from unittest.mock import patch
+        req = Mock()
+        req.transport.get_extra_info.return_value = ('172.30.32.2', 1234)
+        req.method = 'GET'
+        req.path = '/butler/'
+        result = await proxy(req)
+        self.assertEqual(result.status, 200)
+        self.assertIn("script-src 'self'", result.headers['Content-Security-Policy'])
+        req.path = '/butler/assets/access.js'
+        result = await proxy(req)
+        self.assertEqual(result.status, 200)
+        req.path = '/butler/assets/../../access.py'
+        with self.assertRaises(web.HTTPNotFound):
+            await proxy(req)
+        req.path = '/butler/catalog'
+        req.method = 'POST'
+        with self.assertRaises(web.HTTPMethodNotAllowed):
+            await proxy(req)

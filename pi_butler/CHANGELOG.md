@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3 — clearer permissions and searchable pickers
+
+- Explain that the write master switch and matching grant rules are both required;
+  add English/German names and descriptions throughout HA's configuration form.
+- Add a native dropdown for supported control domains.
+- Open the app on a permission builder with searchable live entities/direct labels,
+  exclusions, rule previews and YAML export. Applying grants stays in HA's trusted
+  Configuration tab; no policy-writing API is added.
+
 ## 0.1.2 — account setup build fix
 
 - Restore administrative executable directories to Docker's build PATH so

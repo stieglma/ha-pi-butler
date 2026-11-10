@@ -20,7 +20,7 @@ async def dispatch(message, session):
     if method == 'initialize':
         supported = ['2024-11-05', '2025-03-26', '2025-06-18']
         response['result'] = {'protocolVersion': params.get('protocolVersion') if params.get('protocolVersion') in supported else supported[-1],
-                              'capabilities': {'tools': {}}, 'serverInfo': {'name': 'pi-butler', 'version': '0.1.2'}}
+                              'capabilities': {'tools': {}}, 'serverInfo': {'name': 'pi-butler', 'version': '0.1.3'}}
     elif method == 'ping':
         response['result'] = {}
     elif method == 'tools/list':
