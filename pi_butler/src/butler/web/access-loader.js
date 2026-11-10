@@ -1,5 +1,5 @@
 // Keep startup failures visible even when the editor module cannot load.
-const editorUrl = new URL('./access.js?v=0.1.7', document.currentScript.src);
+const editorUrl = new URL('./access.js?v=0.1.8', document.currentScript.src);
 const startupTimeout = setTimeout(() => startupFailed(new Error('Loading the settings script timed out.')), 15000);
 function startupFailed(error) {
   clearTimeout(startupTimeout);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8 — diagnose denied write grants
+
+- Add read-only access_check for an entity, showing direct labels, failed rule
+  filters, registry/state presence, the write switch and explicit exclusions.
+- Point denied actions to the diagnostic tool and guide Pi to inspect mismatches
+  before suggesting permission changes. Authorization rules remain unchanged.
+
 ## 0.1.7 — make settings startup failures visible
 
 - Serve settings scripts with explicit JavaScript MIME types and disable asset

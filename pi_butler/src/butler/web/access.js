@@ -1,4 +1,4 @@
-import { categories, cleanPolicy, matchingEntities, validateDraft, catalogWarnings } from './policy-model.mjs?v=0.1.7';
+import { categories, cleanPolicy, matchingEntities, validateDraft, catalogWarnings } from './policy-model.mjs?v=0.1.8';
 const $ = id => document.getElementById(id);
 let catalog, draft;
 function node(tag, text, className) {
