@@ -4,7 +4,7 @@ An amd64 Home Assistant app providing Pi Coding Agent and Pi Web, an interactive
 terminal, persistent Git workspaces, and policy-controlled Home Assistant tools.
 
 HA installation and Linux container checks have passed. Runtime integration
-validation in Home Assistant is ongoing. See [validation](VALIDATION.md).
+validation in Home Assistant is ongoing. See [testing and live acceptance](docs/TESTING.md).
 
 Add `https://github.com/stieglma/ha-pi-butler` as a repository in Home Assistant's
 app store, install Pi Butler, keep protection mode enabled, and select Open Web UI.
@@ -25,12 +25,14 @@ The image also bundles structured questions, Powerline footer, dynamic workflows
 subagents and Claude marketplace. See [bundled packages](pi_butler/DOCS.md#bundled-pi-packages)
 for versions and activation. The in-repo local marketplace bundles house memory
 and read-only automation explanations, incident investigations and health checks.
+Use **Investigate your home** to launch these skills with entity/automation pickers
+in a new conversation.
 
 The app never shares the live HA configuration directory. Your existing HA Git
 app owns deployment. A delivery to its watched branch can cause deployment.
 
-[Requirements](PLAN.md) · [Detailed implementation plan](IMPLEMENTATION.md) ·
-[App documentation](pi_butler/DOCS.md) · [Validation results](VALIDATION.md) · [Deferred features](FEATURE_FOLLOW_UP.md)
+[App documentation](pi_butler/DOCS.md) · [Architecture and scope](docs/ARCHITECTURE.md) ·
+[Testing and live acceptance](docs/TESTING.md) · [Changelog](pi_butler/CHANGELOG.md)
 
 ## Development
 
@@ -38,6 +40,7 @@ app owns deployment. A delivery to its watched branch can cause deployment.
 uv sync --project pi_butler --locked
 PYTHONPATH=pi_butler/src uv run --project pi_butler --locked python -m unittest discover -s pi_butler/tests -v
 uv run --project pi_butler --locked python pi_butler/tests/check_metadata.py
+node --test pi_butler/tests/test_browser_policy.mjs pi_butler/tests/test_starters.mjs
 docker build --platform linux/amd64 -t pi-butler:test pi_butler
 uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
 ```
@@ -52,8 +55,8 @@ manifest/lock or the Python dependency project's fixed `0.0.0` version for app
 releases: those files are Docker dependency-cache inputs. Default extension
 registration lives in `pi_butler/bundled-packages.json`, copied after dependency
 installation. Change dependency manifests and regenerate locks only when their
-inputs change. See [BUILD_FOLLOW_UP.md](BUILD_FOLLOW_UP.md) for remaining build
-optimizations and cache validation.
+inputs change. See [testing](docs/TESTING.md) for image/plugin checks and remaining
+live acceptance work.
 
 The Docker smoke check uses a disposable data directory and placeholder upstream
 credential. It tests startup, privilege boundaries and shutdown without contacting

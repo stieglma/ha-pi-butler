@@ -360,8 +360,9 @@ updates use atomic writes and reject stale page versions. Saves wait for ongoing
 write operations before applying the new policy.
 
 
-Rules combine with OR. Nonempty selector lists within a rule combine with AND;
-values within a list combine with OR. At least one selector must be nonempty.
+Rules and nonempty selector lists within a rule combine with OR; matching any
+selected entity, domain or direct label grants the rule’s capability. Values within
+a list also combine with OR. At least one selector must be nonempty.
 Exclusions override every grant. Labels are IDs directly assigned to entities;
 device/area label inheritance is excluded. New matching entities inherit grants.
 Registry membership is fetched on every action and unavailable resolution denies
@@ -458,10 +459,12 @@ The root supervisor protects app options and image code and launches processes
 with clean environments and no-new-privileges/capabilities. Pi runs as uid 1000;
 the HA service as uid 1001 and ingress as uid 1002. Only the HA service receives
 the Supervisor token. Pi reaches approved tools through a group-protected Unix
-socket, never a general HTTP proxy. Policy changes require trusted app options.
+socket, never a general HTTP proxy. Policy changes use the separate ingress
+settings UI and protected management socket.
 This protects against ordinary agent/terminal tools, not kernel exploits or a
 compromised trusted service. Separate UIDs alone do not establish successful
-isolation: run the validation checklist under HA protection mode.
+isolation: run the [live acceptance checklist](../docs/TESTING.md#live-acceptance-checklist)
+under HA protection mode.
 
 For an ingress 403, verify Supervisor uses the documented source `172.30.32.2`.
 Do not disable the check to expose the app. Pi Web listens on loopback only and
