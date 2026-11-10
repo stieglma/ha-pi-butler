@@ -26,5 +26,5 @@ for language in ('en', 'de'):
     for section, definition in config['schema'].items():
         fields = translated[section]['fields']
         assert set(fields) == set(definition)
-assert config['ingress_entry'] == '/'
+assert not config.get('ingress_entry'), 'Root entry must not add a slash to HA ingress URL'
 print('HA metadata, translations and bundled package pins passed')

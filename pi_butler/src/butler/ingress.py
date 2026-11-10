@@ -18,26 +18,28 @@ async def proxy(request):
     peer = request.transport.get_extra_info('peername')
     if not peer or peer[0] != INGRESS_PEER:
         raise web.HTTPForbidden(text='Home Assistant ingress required')
-    if request.path == '/butler/status':
+    # Older ingress_entry='/' produced a second slash after HA's prefix.
+    path = '/' + request.path.lstrip('/')
+    if path == '/butler/status':
         try:
             status = json.loads(Path('/data/status/repository.json').read_text())
         except (OSError, ValueError):
             status = {'state': 'pending', 'help': 'Run butler-workspace setup in the terminal.'}
         return web.json_response({'repository': status, 'help': 'Use butler-workspace setup to retry. HA access: Pi MCP pi_butler.'})
-    if request.path in ('/butler', '/butler/'):
+    if path in ('/butler', '/butler/'):
         if request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
-        if request.path == '/butler':
+        if path == '/butler':
             # Canonical relative URL: preserve HA's dynamic ingress prefix.
             raise web.HTTPFound('butler/')
         return web.FileResponse(WEB_ROOT / 'access.html', headers=PAGE_HEADERS)
-    if request.path.startswith('/butler/assets/'):
-        name = request.path.removeprefix('/butler/assets/')
+    if path.startswith('/butler/assets/'):
+        name = path.removeprefix('/butler/assets/')
         if request.method != 'GET' or name not in {'access.js', 'access.css', 'policy-model.mjs', 'navigation.css'}:
             raise web.HTTPNotFound()
         return web.FileResponse(WEB_ROOT / name, headers={'X-Content-Type-Options': 'nosniff'})
-    if request.path in ('/butler/catalog', '/butler/permissions'):
-        saving = request.path.endswith('/permissions')
+    if path in ('/butler/catalog', '/butler/permissions'):
+        saving = path.endswith('/permissions')
         expected = 'POST' if saving else 'GET'
         if request.method != expected:
             raise web.HTTPMethodNotAllowed(request.method, [expected])
@@ -59,11 +61,11 @@ async def proxy(request):
         except Exception:
             return web.json_response({'error': 'HA picker service is unavailable; retry after the app finishes starting.'}, status=502)
     headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP and not k.lower().startswith('x-forwarded-') and k.lower() != 'forwarded'}
-    if request.method == 'GET' and request.path == '/':
+    if request.method == 'GET' and path == '/':
         headers = {k: v for k, v in headers.items() if k.lower() not in {'if-none-match', 'if-modified-since'}}
         headers['Accept-Encoding'] = 'identity'
     # Preserve public Host and Origin for Pi Web's own Origin guard.
-    url = 'http://127.0.0.1:8504' + request.rel_url.raw_path_qs
+    url = 'http://127.0.0.1:8504' + '/' + request.rel_url.raw_path_qs.lstrip('/')
     client = request.app[CLIENT]
     if request.headers.get('Upgrade', '').lower() == 'websocket':
         protocols = [p.strip() for p in request.headers.get('Sec-WebSocket-Protocol', '').split(',') if p.strip()]
@@ -91,7 +93,7 @@ async def proxy(request):
             return browser
     async with client.request(request.method, url, headers=headers, data=request.content.iter_chunked(65536) if request.can_read_body else None, allow_redirects=False) as upstream:
         response_headers = {k: v for k, v in upstream.headers.items() if k.lower() not in HOP}
-        if request.method == 'GET' and request.path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
+        if request.method == 'GET' and path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
             body = await upstream.read()
             navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Home Assistant access</a>'
             body = body.replace(b'</body>', navigation + b'</body>', 1)

@@ -25,6 +25,8 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
         backend = web.Application()
         received = []
         async def echo(request):
+            if request.path.startswith('//'):
+                return web.json_response({'code': 'FST_STATIC_FORBIDDEN_PATH'}, status=403)
             if request.path == '/':
                 return web.Response(text='<html><body><div id="root">Pi Web</div></body></html>', content_type='text/html', headers={'ETag': 'original'})
             received.append((request.path_qs, request.headers.get('Host'), request.headers.get('Origin')))
@@ -64,6 +66,12 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
                     self.assertIn('Pi Web', body)
                     self.assertIn('href="butler/" target="_blank"', body)
                     self.assertNotIn('ETag', response.headers)
+                async with session.get(front_url + '//', headers=headers) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertIn('Home Assistant access', await response.text())
+                async with session.get(front_url + '//butler/', headers=headers) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertIn('Save and apply', await response.text())
                 async with session.get(front_url + '/api/test?q=1', headers=headers) as response:
                     self.assertEqual(response.status, 200)
                     self.assertEqual(await response.text(), 'proxied')

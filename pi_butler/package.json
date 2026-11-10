@@ -1,6 +1,6 @@
 {
   "name": "pi-butler-runtime",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.5.1",

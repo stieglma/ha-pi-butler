@@ -188,3 +188,12 @@ separate tab, save confirmation and persistence after reloading the settings pag
 Docker is unavailable in this local environment, so the updated Linux identity
 and socket boundary smoke checks still need CI. Real HA ingress and the actual
 Pi Web interface still need integration validation.
+
+## 0.1.6 ingress root correction
+
+Supervisor appends `ingress_entry` to an ingress URL that already ends in `/`.
+Setting it to `/` therefore produced `//`, reaching Pi Web's static wildcard
+instead of its explicit `/` HTML route. The app now omits `ingress_entry` and
+normalizes leading slashes before local routing or upstream proxying. Regression
+coverage checks both `//` and `//butler/`; all 63 Python tests and metadata checks
+pass. Real HA verification remains pending.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 — fix ingress landing page
+
+- Use HA's default ingress entry to avoid a doubled slash that Pi Web rejects
+  with FST_STATIC_FORBIDDEN_PATH. Normalize leading slashes for existing tabs.
+
 ## 0.1.5 — separate access settings and immediate permission updates
 
 - Open Pi Web directly, with a persistent Home Assistant access link opening
