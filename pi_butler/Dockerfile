@@ -1,5 +1,5 @@
 # Node includes the Pi Web-required SDK runtime; Debian supports native node-pty.
-FROM node:24.11.0-bookworm-slim@sha256:76d0ed0ed93bed4f4376211e9d8fddac4d8b3fbdb54cc45955696001a3c91152
+FROM node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d
 COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /usr/local/bin/uv
 ARG TARGETARCH=amd64
 ENV PYTHONPATH=/opt/butler \
@@ -20,7 +20,7 @@ WORKDIR /opt/runtime
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev \
     && test -x node_modules/.bin/pi \
-    && node -e "require('node-pty'); console.log(require.resolve('@earendil-works/pi-coding-agent'))" \
+    && node --input-type=module -e "import { createRequire } from 'node:module'; createRequire(import.meta.url)('node-pty'); console.log(import.meta.resolve('@earendil-works/pi-coding-agent'))" \
     && node_modules/.bin/pi --version \
     && npm cache clean --force
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_linux_amd64.tar.gz -o /tmp/gh.tgz \

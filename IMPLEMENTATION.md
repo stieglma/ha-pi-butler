@@ -111,3 +111,14 @@ Python dependencies use a non-packaged uv project in `pi_butler/pyproject.toml`
 and the committed `uv.lock`. Docker and CI run locked sync; runtime processes
 continue to use `/opt/venv` directly. uv 0.11.28 is pinned in CI and by image digest
 in Docker. Source modules retain their existing PYTHONPATH-based deployment.
+
+## Bundled extension implementation
+
+The four requested Pi extensions plus pi-claude-marketplace are pinned in the
+npm manifest/lock. piButler.packages is the image-default registration list.
+A pi-user profile initialization step runs before web/sessiond and merges local
+package paths without replacing provider settings or resource filters. A history
+file remembers defaults offered so user removal persists; new image defaults
+are seeded once. Node 24.15.0 satisfies the marketplace engine requirement.
+The extension loader is bundled; actual custom marketplace/skill content remains
+to be defined. Native HA MCP remains separate from optional marketplace MCP.

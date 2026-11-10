@@ -28,6 +28,68 @@ Web's daemon rebuilds its provider baseline. The image and runtime are immutable
 for the Pi user: update Pi/Pi Web by updating the app, not using in-terminal
 self-update commands.
 
+## Bundled Pi packages
+
+The image includes and registers these pinned Pi packages on first startup:
+
+| Package | Version | Use |
+| --- | --- | --- |
+| @juicesharp/rpiv-ask-user-question | 2.15.0 | Structured clarification questions; terminal UI and RPC dialog fallback |
+| pi-powerline-footer | 0.22.0 | Terminal footer and supported hosted status widgets |
+| @quintinshaw/pi-dynamic-workflows | 3.15.0 | Workflow orchestration, skills and child agents |
+| pi-subagents | 0.87.0 | Delegation, agent definitions and workflow resources |
+| pi-claude-marketplace | 0.23.0 | Import commands, skills and other supported components from Claude marketplaces |
+
+Packages live in `/opt/runtime/node_modules`, installed from `package.json` and
+`package-lock.json` during the image build. The `piButler.packages` list in
+`package.json` selects packages registered in `/data/pi/settings.json`. Startup
+registers their local directories as the pi user, without running `pi install`
+against npm or needing a network connection. The pinned Node runtime is 24.15.0
+to satisfy the marketplace package's supported engine range.
+
+Existing provider settings, other package declarations and resource filters are
+preserved. Existing npm declarations of the same package keep their configured
+source/version. `/data/pi/butler-bundles.json` records defaults already offered,
+so removing a package through Pi Web's settings or `pi remove <local-package-path>`
+is respected on restart. Use `pi install /opt/runtime/node_modules/<package>` to
+re-enable a removed bundled package. Image updates change the installed version
+at that stable local path; user-managed npm installs keep their own version.
+
+The question extension uses native RPC select/input dialogs in supporting web
+hosts; its full tabbed terminal questionnaire and Powerline's full editor UI
+belong to the terminal. Workflow/subagent tools load in the hosted session, but
+extension-specific rich progress panels depend on host support. Test these UI
+paths in the actual HA ingress environment. Workflow keyword activation applies
+to interactive input; hosted RPC sessions can use explicit commands/tool requests.
+
+### Our own skills marketplace
+
+`pi-claude-marketplace` supports local marketplace directories with
+`.claude-plugin/marketplace.json` as well as Git-hosted marketplaces. We can ship
+that directory in the image and register its skills plugins, or maintain a shared
+Git repository and pin its revision. No marketplace or skills content has been
+authored, imported or auto-enabled in this release; the loader is ready for it.
+For a marketplace you have prepared:
+
+```text
+/claude:plugin marketplace add /path/to/marketplace
+/claude:plugin list --available
+/claude:plugin install plugin-name@marketplace-name
+/reload
+```
+
+Use Pi Web's command input or Pi in its terminal. Marketplace configuration and
+installed state live under the persistent Pi profile. Skill-only plugins do not
+require pi-mcp-adapter. Marketplace MCP components specifically require that
+separate adapter, which is not bundled. Pi Butler's HA tools use Pi's built-in
+MCP and remain independent of marketplace plugins. No public marketplace is
+bootstrapped automatically.
+
+All extension/child-agent code runs as pi and uses the same protected HA socket;
+none receives the Supervisor credential. Model usage and workflow/subagent
+concurrency follow the extension settings; `limits.parallel_requests` only caps
+HA tool calls. Resource/storage safeguards still apply to the app as a whole.
+
 ## Repository options
 
 Options are configured in the HA app Configuration tab. Restart after changes.

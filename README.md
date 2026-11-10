@@ -17,6 +17,10 @@ Configure a model provider using Pi Web's existing settings/login flow. Configur
 Git and gh/glab from its terminal. Read [the setup guide](pi_butler/DOCS.md) for
 options, write grants, terminal authentication, delivery and recovery.
 
+The image also bundles structured questions, Powerline footer, dynamic workflows,
+subagents and Claude marketplace. See [bundled packages](pi_butler/DOCS.md#bundled-pi-packages)
+for versions, activation and future skills-marketplace support.
+
 The app never shares the live HA configuration directory. Your existing HA Git
 app owns deployment. A delivery to its watched branch can cause deployment.
 

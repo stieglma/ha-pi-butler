@@ -25,6 +25,7 @@ for attempt in $(seq 1 60); do
   sleep 1
 done
 docker exec "$container_name" test -S /run/butler/pi/sessiond.sock
+docker exec "$container_name" /opt/venv/bin/python3 -c 'import json; from pathlib import Path; manifest=json.loads(Path("/opt/runtime/package.json").read_text()); settings=json.loads(Path("/data/pi/settings.json").read_text()); assert all("/opt/runtime/node_modules/"+name in settings["packages"] for name in manifest["piButler"]["packages"])'
 docker exec "$container_name" curl -fsS http://127.0.0.1:8504/ -o /dev/null
 docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
   --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \

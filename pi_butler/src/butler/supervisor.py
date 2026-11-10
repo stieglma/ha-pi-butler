@@ -163,6 +163,9 @@ def main():
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, lambda *_: STOP.set())
+    profile = spawn('profile', [sys.executable, '-m', 'butler.profile'], PI, PI, [SHARED], pi_env, essential=False)
+    if profile.wait(timeout=30) != 0:
+        raise RuntimeError('Pi profile initialization failed; see app log')
     service_env = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': '/opt/butler', 'HOME': '/data/service',
                    'SUPERVISOR_TOKEN': token, 'LANG': 'C.UTF-8'}
     spawn('access', [sys.executable, '-m', 'butler.access'], ACCESS, SHARED, [SHARED], service_env)

@@ -101,3 +101,21 @@ Locked uv sync and all 44 tests pass on Python 3.14.6 and Python 3.11.15 locally
 Metadata, source compilation and lock consistency checks pass. Docker and CI
 now install from the committed lock with pinned uv 0.11.28. Docker execution
 remains pending because Docker is unavailable here.
+
+## Bundled packages validation (0.1.1)
+
+- 49 Python tests pass on Python 3.11, including five profile tests: settings and
+  resource-filter preservation, idempotent upgrades, respecting removals, invalid
+  input rejection, and real-file initialization/symlink protection.
+- Exact npm pins resolve with no known audit vulnerabilities at check time.
+- All five packages load through Pi 1.5.1 on both local Node 26.12.1 and pinned
+  Node 24.15.0: 10 registered tools, 38 commands and 4 discovered skills. No
+  model/provider calls are made by this smoke check.
+- Fresh profile initialization followed by `pi list` shows all five local sources.
+  Pi Web/sessiond start on Node 24.15.0 with that profile, returning HTTP 200,
+  creating the daemon socket and completing global provider baseline bootstrap.
+- CI now loads every extension as uid 1000 in the Linux image and checks default
+  registrations during startup smoke. Linux Docker/HA execution is still pending.
+- Structured question interaction, terminal footer rendering, hosted progress UI,
+  real delegated model work and custom marketplace imports need live validation.
+  No custom marketplace content has been created or remote marketplace enabled.
