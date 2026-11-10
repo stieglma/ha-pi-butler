@@ -119,3 +119,11 @@ remains pending because Docker is unavailable here.
 - Structured question interaction, terminal footer rendering, hosted progress UI,
   real delegated model work and custom marketplace imports need live validation.
   No custom marketplace content has been created or remote marketplace enabled.
+
+## First HA build attempt and 0.1.2 correction
+
+Thomas's HA Supervisor reached the amd64 image build for 0.1.1 but failed at
+`groupadd: not found` after successful apt installation. GitHub Actions reproduced
+the same failure. Docker's explicit PATH omitted /usr/sbin, where Debian installs
+account-management commands. Version 0.1.2 restores the administrative PATH and
+explicitly installs passwd. HA runtime acceptance remains pending.

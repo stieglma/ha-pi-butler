@@ -3,12 +3,12 @@ FROM node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703
 COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /usr/local/bin/uv
 ARG TARGETARCH=amd64
 ENV PYTHONPATH=/opt/butler \
-    PATH=/opt/runtime/node_modules/.bin:/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
+    PATH=/opt/runtime/node_modules/.bin:/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 RUN test "$TARGETARCH" = amd64 \
     && apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-client python3 make g++ util-linux \
+    && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-client python3 make g++ util-linux passwd \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 1100 butler-client \
     && usermod -l pi -d /data/home -s /bin/bash node \

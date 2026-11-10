@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — account setup build fix
+
+- Restore administrative executable directories to Docker's build PATH so
+  groupadd/usermod/groupmod/useradd can run on Debian slim.
+- Explicitly install the passwd package providing these account-management tools.
+
 ## 0.1.1 — uv and bundled Pi packages
 
 - Replace requirements.txt with pyproject.toml and a committed uv lock; use locked
