@@ -18,12 +18,12 @@ async function run(work, {reloadPolicy = false, savePolicy = false} = {}) {
   if (busy) return;
   busy = true; $('message').textContent = 'Working…';
   document.querySelectorAll('button').forEach(b => {b.disabled = true;});
-  if (savePolicy) document.querySelectorAll('#grants input').forEach(input => {input.disabled = true;});
+  if (savePolicy || reloadPolicy) document.querySelectorAll('#grants input').forEach(input => {input.disabled = true;});
   try { const result = await work(); await refresh(reloadPolicy); $('message').textContent = result || 'Done.'; }
   catch (error) { $('message').textContent = error.message; }
   finally {
     busy = false; document.querySelectorAll('button').forEach(b => {b.disabled = false;});
-    if (savePolicy) document.querySelectorAll('#grants input').forEach(input => {input.disabled = false;});
+    if (savePolicy || reloadPolicy) document.querySelectorAll('#grants input').forEach(input => {input.disabled = false;});
   }
 }
 function renderGrants() {

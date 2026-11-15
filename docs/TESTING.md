@@ -26,9 +26,15 @@ prove behavior with live services.
 
 ## KNX 1.2.0 lifecycle checks
 
-Local release checks passed 119 Python tests and 18 Node tests, metadata validation
+Local release checks passed 122 Python tests and 20 Node tests, metadata validation
 and Python compilation. These checks do not replace the native image and live
 acceptance checks below.
+
+The 122 Python tests also passed in the existing amd64 runtime image with the
+current source mounted. The pinned editor lifecycle smoke passed under emulation,
+including damaged-checkpoint rebuilding and restore while its real closing
+callback prunes the selected revision. This does not establish native firewall
+or live device behavior.
 
 The image CI runs `knx_projects_smoke.py`, `knx_api_smoke.py` and
 `knx_runtime_smoke.py` using the separate pinned editor Python environment, in

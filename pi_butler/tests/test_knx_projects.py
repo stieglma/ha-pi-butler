@@ -67,6 +67,67 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual([r['id'] for r in status['checkpoints']], [first['id']])
         self.assertFalse(any(p.name.startswith('.pending-') for p in self.projects.folder.iterdir()))
 
+    def test_unchanged_state_rebuilds_missing_corrupt_or_incomplete_checkpoint(self):
+        for damage in ('missing', 'corrupt', 'incomplete'):
+            with self.subTest(damage=damage):
+                first = self.projects.checkpoint()
+                folder = self.projects.folder / first['id']
+                if damage == 'missing':
+                    (folder / 'project.knxproj').unlink()
+                elif damage == 'corrupt':
+                    (folder / 'project.xknx').write_bytes(b'corrupt')
+                else:
+                    meta = json.loads((folder / 'checkpoint.json').read_text())
+                    meta['sha256'] = {}
+                    (folder / 'checkpoint.json').write_text(json.dumps(meta))
+                rebuilt = self.projects.checkpoint(force=False)
+                self.assertNotEqual(rebuilt['id'], first['id'])
+                folder, _ = self.projects.find(rebuilt['id'])
+                self.assertEqual((folder / 'project.xknx').read_bytes(), b'native state')
+                self.assertEqual((folder / 'project.knxproj').read_bytes(), b'native state')
+
+    def test_programming_is_blocked_if_damaged_checkpoint_cannot_be_rebuilt(self):
+        from butler.knx_runtime import Runtime
+        first = self.projects.checkpoint()
+        (self.projects.folder / first['id'] / 'project.xknx').unlink()
+        self.projects.export_fn = Mock(side_effect=ValueError('export failed'))
+        runtime = Runtime(self.root)
+        runtime.ctx = SimpleNamespace(run_locked=lambda fn, **kwargs: fn())
+        runtime.projects = self.projects
+        queue = SimpleNamespace(_start=Mock())
+        start = queue._start
+        runtime.guard_program_queue(queue)
+        result = queue._start(SimpleNamespace(scope='PARAMETERS', test=False, node_id=1))
+        self.assertIsInstance(result.exception(), ValueError)
+        start.assert_not_called()
+        self.assertTrue(self.projects.error)
+
+    def test_restore_stages_source_through_closing_callback_pruning(self):
+        first = self.projects.checkpoint()
+        original = self.projects.folder / first['id'] / 'project.xknx'
+        self.project.path.write_bytes(b'new live state')
+        self.project.state_key = lambda: 'new-live-state'
+        self.project.project_password = None
+        self.projects.max_checkpoints = 1
+        staged_paths = []
+        def replace_with(source, password):
+            # Upstream emits closing before it copies the replacement file.
+            self.projects.checkpoint('Project closing', 'editor', force=False)
+            self.assertFalse(original.exists(), 'Closing callback should prune the original source')
+            staged_paths.append(source)
+            self.project.path.write_bytes(source.read_bytes())
+            self.project.state_key = lambda: 'restored'
+        self.project.replace_with = replace_with
+        password_check = Mock()
+        with patch.dict('sys.modules', {
+                'xknxeditor.proj.core.project_secrets': SimpleNamespace(check_project_password=password_check)}):
+            restored = self.projects.restore(first['id'], 'new-live-state')
+        self.assertEqual(self.project.path.read_bytes(), b'native state')
+        self.assertEqual(restored['state'], 'restored')
+        self.assertFalse(staged_paths[0].exists(), 'Restore staging is cleaned up')
+        password_check.assert_called_once_with(staged_paths[0], None)
+        self.projects.find(restored['id'])
+
     def test_checkpoint_history_is_bounded_by_bytes_count_and_age(self):
         self.project.path.write_bytes(b'x' * 1024)
         self.projects.checkpoint_budget = 6500

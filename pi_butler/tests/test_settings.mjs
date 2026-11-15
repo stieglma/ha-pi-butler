@@ -105,6 +105,49 @@ test('KNX permission inputs are disabled while a policy save is pending and reco
   assert.match(ui.element('message').textContent, /Save failed/);
 });
 
+test('KNX permission reload disables inputs through completion and restores them on failure', async () => {
+  for (const ok of [true, false]) {
+    const pending = deferred();
+    let loads = 0;
+    const ui = await page('knx-projects.js', async () => ++loads === 1 ? reply(initial()) : pending.promise);
+    const inputs = ui.descendants(ui.element('grants')).filter(n => n.tag === 'input');
+    const scope = inputs.find(n => n.type !== 'checkbox');
+    scope.value = '7'; scope.listeners.input();
+    const operation = ui.click('reload-policy');
+    assert.ok(inputs.every(input => input.disabled));
+    pending.resolve(ok ? reply(initial()) : reply({error:'Reload failed'}, false));
+    await operation;
+    const currentInputs = ui.descendants(ui.element('grants')).filter(n => n.tag === 'input');
+    assert.ok(currentInputs.every(input => !input.disabled));
+    assert.equal(currentInputs.find(n => n.type !== 'checkbox').value, ok ? '' : '7');
+  }
+});
+
+test('notes typed before initial load keep the server version and baseline for saving and unload warning', async () => {
+  const pending = deferred();
+  let saved;
+  const ui = await page('setup.js', async (url, options) => {
+    if (url === 'status') return reply({checks:{}});
+    if (options.method === 'POST') {
+      saved = JSON.parse(options.body);
+      return reply({text:saved.text, version:'v2'});
+    }
+    return pending.promise;
+  });
+  ui.element('memory').value = 'Draft before first load';
+  ui.element('memory').listeners.input();
+  pending.resolve(reply({text:'Server baseline', version:'v1'}));
+  await turn();
+  assert.equal(ui.element('memory').value, 'Draft before first load');
+  assert.equal(ui.element('memory').disabled, false);
+  assert.equal(ui.element('save').disabled, false);
+  let prevented = false;
+  ui.window.listeners.beforeunload({preventDefault() { prevented = true; }});
+  assert.equal(prevented, true);
+  await ui.click('save');
+  assert.deepEqual(saved, {text:'Draft before first load', version:'v1'});
+});
+
 test('notes typed while Reload is pending are preserved and remain saveable', async () => {
   const pending = deferred();
   let loads = 0, saved;

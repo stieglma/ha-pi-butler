@@ -42,6 +42,11 @@ async function loadMemory() {
   try {
     const result = await api('memory');
     if (byId('memory').value !== requestedText) {
+      if (version === undefined) {
+        version = result.version;
+        savedText = result.text;
+        byId('memory').disabled = false;
+      }
       byId('memory-status').textContent = 'New edits were preserved. Reload again to discard them.';
       return;
     }

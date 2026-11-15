@@ -6,6 +6,7 @@
 - Import repository projects into private working copies, reopen saved native projects, create paired native/exchange checkpoints and restore or deliver selected revisions through the configured Git workflow.
 - Provide seven finite offline assistant writes with default-deny project/device grants; parameter changes also require delete permission. Assistant bus writes and programming remain outside the finite tool surface.
 - Serialize checkpoint delivery from preparation through push so concurrent requests cannot publish another checkpoint's contents.
+- Verify checkpoint artifacts before reuse and stage restore sources through closing callbacks and history pruning. Protect permission inputs during reload and keep early notes edits saveable.
 - Keep the latest ten local checkpoints across projects, subject to age and storage limits. Generate ZIP downloads on demand and preserve recovery data when a checkpoint cannot be created.
 - Preserve unsaved permission drafts during project operations and notes typed during reloads. Validate renamed staged files before Git delivery.
 - Add regression coverage for concurrent delivery, bounded history, browser drafts and renamed-file validation. Physical KNX devices, ETS interoperability and final live HA acceptance still require target testing.

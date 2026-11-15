@@ -87,6 +87,21 @@ def main():
             runtime.projects.download(first['id'], 'zip', download)
             files, _ = unpack_checkpoint(download.read_bytes())
             assert files['project.xknx']
+            # Exercise the real closing callback at the retention boundary: it
+            # prunes the original restore source before replace_with copies it.
+            runtime.execute('assistant', request)
+            runtime.projects.max_checkpoints = 1
+            runtime.execute('restore', {'id': first['id'], 'state': runtime.projects.active()['state']})
+            assert not project.group_addresses
+            assert len(runtime.projects.entries()) == 1
+            assert not folder.exists()
+            # Matching state keys must not permit reuse of a damaged export.
+            latest = runtime.projects.entries()[0]
+            (runtime.projects.folder / latest['id'] / 'project.knxproj').unlink()
+            repaired = runtime.projects.checkpoint(force=False)
+            assert repaired['id'] != latest['id']
+            runtime.projects.find(repaired['id'])
+            runtime.projects.max_checkpoints = 10
             queue = SimpleNamespace(_start=Mock(return_value='would-start'))
             runtime.guard_program_queue(queue)
             item = SimpleNamespace(scope='PARAMETERS', test=False, node_id=1)

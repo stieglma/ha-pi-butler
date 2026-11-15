@@ -182,8 +182,12 @@ class Projects:
         if meta is None:
             raise ValueError('Checkpoint does not belong to the active project')
         folder = self.folder / ident
-        for name, expected in meta['sha256'].items():
-            if name not in ('project.xknx', 'project.knxproj') or digest(folder / name) != expected:
+        hashes = meta.get('sha256')
+        if not isinstance(hashes, dict) or set(hashes) != {'project.xknx', 'project.knxproj'}:
+            raise ValueError('Checkpoint checksums are incomplete')
+        for name, expected in hashes.items():
+            path = folder / name
+            if path.is_symlink() or not path.is_file() or digest(path) != expected:
                 raise ValueError('Checkpoint checksum failed')
         return folder, meta
 
@@ -226,9 +230,14 @@ class Projects:
         self.prune(protected)
         rows = self.entries()
         if not force and rows and rows[0]['state'] == active['state']:
-            self.last = rows[0]
-            self.error = ''
-            return rows[0]
+            try:
+                _, existing = self.find(rows[0]['id'])
+            except (ValueError, OSError, KeyError, TypeError):
+                # A matching state key is insufficient if its recovery files were lost.
+                pass
+            else:
+                self.last, self.error = existing, ''
+                return existing
         ident = uuid.uuid4().hex
         temporary = Path(tempfile.mkdtemp(prefix='.pending-', dir=self.folder))
         try:
@@ -279,12 +288,16 @@ class Projects:
         active = self.active()
         if not active or active['state'] != expected:
             raise ValueError('Project changed. Refresh before restoring.')
-        folder, meta = self.find(ident)
-        # Validate credentials and integrity BEFORE replacing or checkpointing anything.
-        from xknxeditor.proj.core.project_secrets import check_project_password
-        check_project_password(folder / 'project.xknx', self.project.project_password)
-        self.checkpoint('Before restore ' + ident, 'restore', actor, protected=(ident,))
-        self.project.replace_with(folder / 'project.xknx', self.project.project_password)
+        folder, _ = self.find(ident)
+        # Closing callbacks can checkpoint/prune again during replace_with(). Keep
+        # the validated source outside history until replacement has finished.
+        with tempfile.TemporaryDirectory(prefix='.restore-', dir=self.root) as temporary:
+            staged = Path(temporary) / 'project.xknx'
+            shutil.copyfile(folder / 'project.xknx', staged)
+            from xknxeditor.proj.core.project_secrets import check_project_password
+            check_project_password(staged, self.project.project_password)
+            self.checkpoint('Before restore ' + ident, 'restore', actor, protected=(ident,))
+            self.project.replace_with(staged, self.project.project_password)
         try:
             return self.checkpoint('Restored ' + ident, 'restore', actor)
         except Exception:
