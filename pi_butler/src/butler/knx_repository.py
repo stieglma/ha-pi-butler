@@ -58,13 +58,13 @@ def unpack_checkpoint(raw):
 
 
 def deliver_checkpoint(raw, options, config):
-    """Use the same prepare/deliver workflow; never mix in an existing dirty checkout."""
+    """Deliver a validated bundle in a separate worktree, preserving interactive files."""
     options = normalize_options(options)
     config = workspace.validate_config(config)
     files, meta = unpack_checkpoint(raw)
-    # One transaction covers preparation, artifact replacement, staging and push.
+    # All modes use a fresh task worktree; interactive edits never enter delivery.
     with workspace.locked():
-        prepared = workspace.prepare(config, 'knx-' + uuid.uuid4().hex[:12])
+        prepared = workspace.worktree(config, 'knx-' + uuid.uuid4().hex[:12])
         root = Path(prepared['path'])
         # Refuse any concurrent/existing changes before replacing exact delivery files.
         if workspace.run('git', 'status', '--porcelain', cwd=root):
@@ -108,11 +108,18 @@ def deliver_checkpoint(raw, options, config):
                 paths.append(options['repository_directory'] + '/' + name)
         finally:
             os.close(fd)
+        object_format = workspace.run('git', 'rev-parse', '--show-object-format', cwd=root)
+        expected_blobs = {}
+        for source, name in names.items():
+            data = files[source]
+            blob = b'blob ' + str(len(data)).encode() + b'\0' + data
+            expected_blobs[options['repository_directory'] + '/' + name] = hashlib.new(object_format, blob).hexdigest()
         workspace.run('git', 'add', '--', *paths, cwd=root)
         staged = set(filter(None, workspace.run('git', 'diff', '--cached', '--name-only', '-z', cwd=root).split('\0')))
         if staged - set(paths):
             raise ValueError('Other staged changes appeared during KNX delivery; checkout retained for review')
         try:
-            return workspace.deliver(config, root, 'KNX checkpoint: ' + str(meta.get('comment') or meta['created'])[:200])
+            return workspace.deliver(config, root, 'KNX checkpoint: ' + str(meta.get('comment') or meta['created'])[:200],
+                                     expected_blobs=expected_blobs)
         except Exception as exc:
             raise ValueError('Git delivery failed; checkpoint and prepared checkout are retained. Inspect repository status before retrying.') from exc

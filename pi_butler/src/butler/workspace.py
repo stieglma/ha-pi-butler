@@ -210,7 +210,7 @@ def forge_delivery(config, cwd, current):
     return existing[0]['web_url']
 
 
-def deliver(config, cwd, message):
+def deliver(config, cwd, message, expected_blobs=None):
     cwd = Path(run('git', 'rev-parse', '--show-toplevel', cwd=cwd)).resolve()
     if not cwd.is_relative_to(ROOT.resolve()):
         raise WorkspaceError('Delivery must run inside an app workspace')
@@ -231,11 +231,23 @@ def deliver(config, cwd, message):
         run('git', 'fetch', 'origin', base, cwd=cwd)
         if config['delivery'] == 'push':
             run('git', 'merge-base', '--is-ancestor', f'refs/remotes/origin/{base}', 'HEAD', cwd=cwd)
+        baseline = run('git', 'rev-parse', 'HEAD', cwd=cwd)
+        if expected_blobs is not None:
+            for path, expected in expected_blobs.items():
+                if run('git', 'rev-parse', ':' + path, cwd=cwd) != expected:
+                    raise WorkspaceError('Staged checkpoint checksum mismatch; delivery stopped')
         check_changes(cwd)
         if run('git', 'diff', '--cached', '--name-only', cwd=cwd):
             if not message.strip():
                 raise WorkspaceError('Commit message required')
             run('git', 'commit', '-m', message, cwd=cwd)
+        if expected_blobs is not None:
+            changed = set(filter(None, run('git', 'diff', '--name-only', '-z', baseline, 'HEAD', cwd=cwd).split('\0')))
+            if changed - set(expected_blobs):
+                raise WorkspaceError('Unexpected committed checkpoint files; delivery stopped')
+            for path, expected in expected_blobs.items():
+                if run('git', 'rev-parse', 'HEAD:' + path, cwd=cwd) != expected:
+                    raise WorkspaceError('Committed checkpoint checksum mismatch; delivery stopped')
         run('git', 'push', 'origin', f'HEAD:refs/heads/{target}', cwd=cwd)
         commit = run('git', 'rev-parse', 'HEAD', cwd=cwd)
         if config['delivery'] == 'push':

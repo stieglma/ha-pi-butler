@@ -523,15 +523,18 @@ Password-protected exchange archives can still be imported through the editor UI
 - Restore of a checkpoint belonging to the active project, guarded against stale
   project state and checksum failures. Current state is checkpointed before restore;
   the restored state creates a new revision. This does not revert bus devices.
-- Explicit **Deliver this checkpoint to Git**, using the existing prepare/deliver
-  workflow, configured branches and push or pull request mode. It writes the configured
+- Explicit **Deliver this checkpoint to Git**, using a separate task worktree,
+  configured branches and push or pull request mode. Staged and committed artifacts
+  are checked against the selected bundle before pushing; the interactive checkout
+  is preserved. It writes the configured
   `.knxproj`, a sibling with `.xknx` extension and `checkpoint.json`. Dirty work is
   preserved and delivery stops on conflicts/failure. Checkpoints remain available
   privately if Git delivery fails. Commits are not pushed automatically on each edit.
 - Assistant grants per project GUID and optionally device node IDs, for supported
   add/change/delete operations. Empty device scope means the whole project. Writes
   default to denied; parameter changes require change and delete rights because they
-  can remove links. Group-address-wide changes need a project-wide grant. Authorization
+  can remove links. Group-address-wide changes need a project-wide grant, including change permission
+  when linking fills an empty group-address data type. Authorization
   and mutation run in the same locked UI task, with checkpoints before and after. Normal queued UI device programming also requires a complete
   checkpoint before starting; an export failure blocks that programming operation.
 

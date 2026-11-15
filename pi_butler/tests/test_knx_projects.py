@@ -74,6 +74,52 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual([r['id'] for r in status['checkpoints']], [first['id']])
         self.assertFalse(any(p.name.startswith('.pending-') for p in self.projects.folder.iterdir()))
 
+    def test_failed_export_preserves_active_history_after_another_project(self):
+        first = self.projects.checkpoint()
+        manifest = self.projects.folder / first['id'] / 'checkpoint.json'
+        meta = json.loads(manifest.read_text())
+        self.project.ensure_guid = lambda: 'project-B'
+        self.projects.checkpoint()
+        meta['created'] = '2000-01-01T00:00:00+00:00'
+        manifest.write_text(json.dumps(meta))
+        self.project.ensure_guid = lambda: 'project-guid'
+        self.project.state_key = lambda: 'changed'
+        self.projects.export_fn = Mock(side_effect=ValueError('export failed'))
+        with self.assertRaises(ValueError):
+            self.projects.checkpoint()
+        self.projects.find(first['id'])
+        self.projects.export_fn = lambda src, dst: (dst.write_bytes(src.read_bytes()), [])[1]
+        self.projects.checkpoint()
+        self.assertFalse(manifest.exists())
+
+    def test_link_metadata_requires_project_wide_change(self):
+        from butler.knx_runtime import Runtime
+        runtime = Runtime(self.root)
+        runtime.ctx = SimpleNamespace(api=self.ctx.api, run_locked=lambda fn, **kw: fn())
+        runtime.projects = self.projects
+        co = SimpleNamespace(db_id=11)
+        self.project.find_device_by_node_id = lambda node: SimpleNamespace(find_com_object=lambda ref: co)
+        self.project.get_links_for_com_object = lambda ident: []
+        self.project._dpt_to_derive_on_link = lambda co, ga: 'DPST-1-1'
+        grants = [{'project_guid': 'project-guid', 'capabilities': ['add', 'change'], 'node_ids': [7]}]
+        runtime.policy = lambda: {'grants': grants}
+        tool = runtime.tools['project_link_com_object'] = Mock(return_value={})
+        request = {'tool': 'project_link_com_object', 'arguments': {
+            'node_id': 7, 'group_address_id': 1, 'com_object_ref_id': 'ref'}}
+        with self.assertRaises(Rejected):
+            runtime.execute('assistant', request)
+        tool.assert_not_called()
+        grants.append({'project_guid': 'project-guid', 'capabilities': ['change'], 'node_ids': []})
+        runtime.execute('assistant', request)
+        self.assertEqual(tool.call_count, 1)
+        grants.pop()
+        self.project._dpt_to_derive_on_link = lambda co, ga: None
+        runtime.execute('assistant', request)
+        self.project._dpt_to_derive_on_link = lambda co, ga: 'DPST-1-1'
+        self.project.get_links_for_com_object = lambda ident: [SimpleNamespace(group_address_id=1)]
+        runtime.execute('assistant', request)
+        self.assertEqual(tool.call_count, 3)
+
     def test_unchanged_state_rebuilds_missing_corrupt_or_incomplete_checkpoint(self):
         for damage in ('missing', 'corrupt', 'incomplete'):
             with self.subTest(damage=damage):
@@ -328,7 +374,7 @@ class KnxDeliveryTests(unittest.TestCase):
             return raw.getvalue()
 
         first_prepared, release_first, second_started, second_prepared = (threading.Event() for _ in range(4))
-        original_prepare = workspace.prepare
+        original_prepare = workspace.worktree
         def prepare(config, name):
             result = original_prepare(config, name)
             if not first_prepared.is_set():
@@ -343,7 +389,7 @@ class KnxDeliveryTests(unittest.TestCase):
             return deliver_checkpoint(bundle('B'), {}, self.config)
 
         with patch.object(workspace, 'validate_config', side_effect=lambda value: value), \
-                patch.object(workspace, 'prepare', side_effect=prepare), \
+                patch.object(workspace, 'worktree', side_effect=prepare), \
                 ThreadPoolExecutor(max_workers=2) as pool:
             a = pool.submit(deliver_checkpoint, bundle('A'), {}, self.config)
             try:
@@ -359,6 +405,38 @@ class KnxDeliveryTests(unittest.TestCase):
             for name, expected in [('project.xknx', label), ('project.knxproj', 'export ' + label)]:
                 self.assertEqual(workspace.run('git', '--git-dir', str(self.remote), 'show',
                     result['commit'] + ':knx_editor/' + name), expected)
+
+    def test_delivery_rejects_tampered_artifacts_and_preserves_interactive_edit(self):
+        from butler import workspace
+        files = {'project.xknx': b'native', 'project.knxproj': b'export'}
+        meta = {'created': 'test', 'sha256': {n: hashlib.sha256(v).hexdigest() for n, v in files.items()}}
+        raw = io.BytesIO()
+        with zipfile.ZipFile(raw, 'w') as archive:
+            for name, data in files.items():
+                archive.writestr(name, data)
+            archive.writestr('checkpoint.json', json.dumps(meta))
+        repo = workspace.ROOT / 'repository'
+        original_run = workspace.run
+        remote_before = original_run('git', '--git-dir', str(self.remote), 'rev-parse', 'deploy')
+        for phase in ('stage', 'commit'):
+            def run(*args, **kwargs):
+                if args[:2] == ('git', 'add'):
+                    (repo / 'interactive.txt').write_text('keep interactive edit')
+                    if phase == 'stage':
+                        (kwargs['cwd'] / 'knx_editor/project.knxproj').write_bytes(b'tampered')
+                result = original_run(*args, **kwargs)
+                if phase == 'commit' and args[:2] == ('git', 'commit'):
+                    path = kwargs['cwd'] / 'knx_editor/project.knxproj'
+                    path.write_bytes(b'hook tamper')
+                    original_run('git', 'add', '--', 'knx_editor/project.knxproj', cwd=kwargs['cwd'])
+                    original_run('git', 'commit', '--amend', '--no-edit', cwd=kwargs['cwd'])
+                return result
+            with patch.object(workspace, 'validate_config', side_effect=lambda value: value), \
+                    patch.object(workspace, 'run', side_effect=run):
+                with self.assertRaises(ValueError):
+                    deliver_checkpoint(raw.getvalue(), {}, self.config)
+            self.assertEqual((repo / 'interactive.txt').read_text(), 'keep interactive edit')
+            self.assertEqual(original_run('git', '--git-dir', str(self.remote), 'rev-parse', 'deploy'), remote_before)
 
     def test_binary_checkpoint_delivery_and_preservation_of_unrelated_work(self):
         private = self.root / 'private'
@@ -378,9 +456,9 @@ class KnxDeliveryTests(unittest.TestCase):
         with patch('butler.workspace.validate_config', side_effect=lambda value: value):
             result=deliver_checkpoint(raw,{},self.config)
         repo=self.root/'workspaces/repository'
-        self.assertEqual((repo/'knx_editor/project.xknx').read_bytes(),native.read_bytes())
+        self.assertFalse((repo/'knx_editor').exists())
         self.assertEqual(result['branch'],'deploy')
         (repo/'unfinished').write_text('keep me')
-        with self.assertRaises(Exception):
+        with patch('butler.workspace.validate_config', side_effect=lambda value: value):
             deliver_checkpoint(raw,{},self.config)
         self.assertEqual((repo/'unfinished').read_text(),'keep me')

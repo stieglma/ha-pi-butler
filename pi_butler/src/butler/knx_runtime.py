@@ -126,6 +126,18 @@ class Runtime:
                 if not active:
                     raise Rejected('Open a project first')
                 authorize(self.policy(), name, args, active['guid'])
+                # The pinned editor types an untyped GA as a side effect of linking.
+                # Device-scoped add/change rights do not authorize that global edit.
+                if name == 'project_link_com_object':
+                    project = self.ctx.api.project
+                    device = project.find_device_by_node_id(args['node_id'])
+                    co = device.find_com_object(args['com_object_ref_id']) if device else None
+                    ga_id = args['group_address_id']
+                    if co is not None and co.db_id is not None:
+                        duplicate = any(link.group_address_id == ga_id
+                                        for link in project.get_links_for_com_object(co.db_id))
+                        if not duplicate and project._dpt_to_derive_on_link(co.db_id, ga_id):
+                            authorize(self.policy(), 'project_rename_group_address', {}, active['guid'])
                 # Refuse mutations without a complete recovery point. All checks
                 # and the actual mutation share this UI task and its project lock.
                 projects.checkpoint('Before ' + name, 'assistant', force=False)

@@ -121,6 +121,27 @@ def main():
             assert original.is_file()
             assert project.path != original
             assert runtime.projects.active()['name'] == 'Synthetic House'
+            # A device add grant cannot implicitly type a project-wide group address.
+            device = project.devices[0]
+            co = next(co for co in device.com_objects if co.db_id is not None and co.dpt.token)
+            ga = runtime.tools['project_create_group_address'](name='Permission probe', address='1/2/4')
+            ga_id = ga['group_address_id']
+            guid = runtime.projects.active()['guid']
+            grants = [{'project_guid': guid, 'capabilities': ['add', 'change'], 'node_ids': [device.node_id]}]
+            runtime.execute('policy', {'version': runtime.policy_version(), 'grants': grants})
+            link = {'tool': 'project_link_com_object', 'arguments': {
+                'node_id': device.node_id, 'com_object_ref_id': co.id, 'group_address_id': ga_id}}
+            try:
+                runtime.execute('assistant', link)
+            except Rejected:
+                pass
+            else:
+                raise AssertionError('Device grant allowed project-wide metadata change')
+            assert not project.get_group_address(ga_id).datapoint_type
+            grants.append({'project_guid': guid, 'capabilities': ['change'], 'node_ids': []})
+            runtime.execute('policy', {'version': runtime.policy_version(), 'grants': grants})
+            runtime.execute('assistant', link)
+            assert project.get_group_address(ga_id).datapoint_type == co.dpt.token
             project.close()
 
     print('Pinned editor: manual-project adoption, paired export, denied/granted write, restore and repository reimport passed')

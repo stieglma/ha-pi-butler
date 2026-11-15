@@ -5,6 +5,7 @@
 - Release the optional KNX Editor integration with admin-only ingress, isolated runtime, gateway firewall protection and automatically configured assistant tools.
 - Import repository projects into private working copies, reopen saved native projects, create paired native/exchange checkpoints and restore or deliver selected revisions through the configured Git workflow.
 - Provide seven finite offline assistant writes with default-deny project/device grants; parameter changes also require delete permission. Assistant bus writes and programming remain outside the finite tool surface.
+- Isolate checkpoint Git delivery from the interactive checkout and verify staged/committed artifact contents before pushing. Require project-wide change permission for implicit group-address typing, and preserve the active project’s latest checkpoint until replacement succeeds.
 - Serialize checkpoint delivery from preparation through push so concurrent requests cannot publish another checkpoint's contents.
 - Verify checkpoint artifacts before reuse and stage restore sources through closing callbacks and history pruning. Protect permission inputs during reload and keep early notes edits saveable.
 - Keep the latest ten local checkpoints across projects, subject to age and storage limits. Generate ZIP downloads on demand and preserve recovery data when a checkpoint cannot be created.

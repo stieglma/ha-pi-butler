@@ -228,7 +228,11 @@ class Projects:
         active = self.active()
         if not active:
             raise ValueError('Open a project first')
-        self.prune(protected)
+        rows = self.entries()
+        # Another project's newer checkpoint must not displace this recovery point
+        # until snapshot/export and publication of its replacement have succeeded.
+        previous = (rows[0]['id'],) if rows else ()
+        self.prune((*protected, *previous))
         rows = self.entries()
         if not force and rows and rows[0]['state'] == active['state']:
             try:
