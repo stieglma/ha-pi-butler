@@ -66,5 +66,7 @@ Marketplace MCP support is optional and pi-mcp-adapter is intentionally absent.
 - Editor source/license and dependency source archive are retained in the image.
   The image does not bundle .NET/ETS signing or key-extraction helpers.
 
-These pins have local dependency-install/transport evidence, not a passing amd64
-image or live HA acceptance result. See [KNX implementation](../docs/KNX-EDITOR-IMPLEMENTATION.md).
+These pins have local dependency-install/transport evidence and a passing amd64
+build/container smoke on Colima (2026-11-15), with the test environment and MCP
+readiness corrections described in [KNX implementation](../docs/KNX-EDITOR-IMPLEMENTATION.md).
+Live HA acceptance remains open.

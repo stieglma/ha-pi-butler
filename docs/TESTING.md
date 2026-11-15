@@ -26,6 +26,18 @@ prove behavior with live services.
 
 ## Image and runtime checks
 
+On macOS with Colima, ensure the Docker CLI is on `PATH` and Colima is running.
+For a Homebrew installation whose Docker CLI is not linked, use:
+
+```sh
+export PATH="$(brew --prefix docker)/bin:$PATH"
+colima status
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
+This uses the current Docker context. The app remains amd64-only, including when
+these tests run through emulation on Apple Silicon.
+
 With Docker available, run the same checks as the
 [CI workflow](../.github/workflows/check.yaml):
 
@@ -102,6 +114,11 @@ steps](KNX-EDITOR-IMPLEMENTATION.md). New unit tests cover active-admin identity
 HTTP/WebSocket credentials, finite read tools and denied arguments. The synthetic
 `knx_mcp_smoke.py` checks pinned FastMCP JSON/SSE framing and bearer authentication
 without opening a project or GUI. The container smoke now also enables KNX and
-checks process startup/private boundaries; that expanded container run remains
-unexecuted locally because Docker is unavailable. Original-project import, export,
+checks process startup/private boundaries. The amd64 build and expanded container
+smoke passed locally on Colima on 2026-11-15 after reproducing and fixing the clean
+environment mismatch and separate MCP startup race. Both boundary probes retain
+all credential/capability assertions; endpoint checks wait for each listener and
+still require denied responses. Runtime version/native checks, all 93 Python
+container tests, and the plugin, marketplace and model-readiness smokes also passed
+locally against that image. Original-project import, export,
 HA ingress, bus connectivity and device support have no acceptance evidence yet.

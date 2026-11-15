@@ -100,9 +100,15 @@ unverified. No host networking or new host ports are enabled.
 
 Local evidence: Python unit tests, browser model tests, metadata/compile checks,
 and a synthetic authenticated FastMCP 4.2.0 JSON/SSE transport smoke. This uses no
-editor GUI session, original project or KNX hardware. Docker is unavailable on
-the development machine; the changed image and expanded container smoke have not
-been run. There is no published release or successful HA installation claim.
+editor GUI session, original project or KNX hardware. The amd64 image and expanded container smoke have now passed locally on Colima
+(2026-11-15). The original CI failure was reproduced locally: the KNX boundary
+probe inherited the synthetic Supervisor token from `docker exec`. Both probes
+now share a clean Pi environment. Runtime checks, 93 Python tests inside the image,
+and all three package/marketplace/model-readiness smokes also passed locally.
+A second reproduced startup race required
+waiting separately for the web and MCP listeners before checking their denied
+responses. Neither correction relaxes the security assertions. There is no
+published release or successful HA installation claim.
 
 On a Docker-capable machine or CI run the commands in `docs/TESTING.md`.
 `container_smoke.sh` now includes enabled-editor startup and direct endpoint /

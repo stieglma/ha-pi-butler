@@ -12,6 +12,15 @@ cleanup() {
   rm -rf "$task_data"
 }
 trap cleanup EXIT
+# docker exec inherits the image/container environment, unlike supervisor-spawned
+# Pi processes. Use the same clean Pi environment and identity for both probes.
+probe_agent_boundary() {
+  docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
+    --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
+    env -i PATH=/opt/runtime/node_modules/.bin:/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
+    PYTHONPATH=/opt/butler HOME=/data/home PI_CODING_AGENT_DIR=/data/pi \
+    /opt/venv/bin/python3 /tests/boundary_probe.py
+}
 python3 - "$task_data/options.json" <<'PY'
 import json,sys,yaml
 from pathlib import Path
@@ -70,11 +79,7 @@ projects = json.load(urllib.request.urlopen("http://127.0.0.1:8504/api/projects"
 scratch = [project for project in projects if project["path"] == "/data/workspaces/scratch"]
 assert len(scratch) == 1 and scratch[0]["name"] == "Home Assistant", projects
 ' 
-docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
-  --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
-  env -i PATH=/opt/runtime/node_modules/.bin:/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
-  PYTHONPATH=/opt/butler HOME=/data/home PI_CODING_AGENT_DIR=/data/pi \
-  /opt/venv/bin/python3 /tests/boundary_probe.py
+probe_agent_boundary
 docker exec "$container_name" setpriv --reuid 1002 --regid 1002 --groups 1100 \
   --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
   env -i PATH=/opt/venv/bin:/usr/bin:/bin /opt/venv/bin/python3 -c 'import socket; connection=socket.socket(socket.AF_UNIX); connection.connect("/run/butler/admin/settings.sock"); connection.close()'
@@ -93,15 +98,23 @@ options["knx"] = {"enabled": True, "read_enabled": True}
 p.write_text(json.dumps(options))
 '
 docker start "$container_name"
-for attempt in $(seq 1 60); do
-  if [ "$(docker exec "$container_name" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8511/ || true)" = 403 ]; then break; fi
-  sleep 1
-done
-test "$(docker exec "$container_name" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8511/)" = 403
+# The web listener and MCP server start independently. A ready web UI does not
+# imply MCP is accepting requests yet, especially under amd64 emulation.
+wait_http_status() {
+  local url="$1" expected="$2" status
+  for attempt in $(seq 1 60); do
+    status=$(docker exec "$container_name" curl -s --connect-timeout 1 --max-time 2 \
+      -o /dev/null -w '%{http_code}' "$url" || true)
+    if [ "$status" = "$expected" ]; then return 0; fi
+    sleep 1
+  done
+  echo "Timed out waiting for $url: expected HTTP $expected, got $status" >&2
+  return 1
+}
+wait_http_status http://127.0.0.1:8511/ 403
+wait_http_status http://127.0.0.1:8512/mcp 401
 docker exec "$container_name" test -S /run/butler/knx/read.sock
-docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
-  --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
-  /opt/venv/bin/python3 /tests/boundary_probe.py
+probe_agent_boundary
 docker exec "$container_name" /opt/venv/bin/python3 -c '
 import json, urllib.request, urllib.error
 from pathlib import Path
@@ -109,7 +122,7 @@ mcp = json.loads(Path("/data/pi/mcp.json").read_text())["mcpServers"]
 assert mcp["pi_butler_knx"]["args"] == ["--knx"]
 for port, route in [(8511, "/"), (8511, "/upload"), (8511, "/files/key/file"), (8512, "/mcp")]:
     try:
-        urllib.request.urlopen(f"http://127.0.0.1:{port}{route}")
+        urllib.request.urlopen(f"http://127.0.0.1:{port}{route}", timeout=5)
     except urllib.error.HTTPError as exc:
         assert exc.code in (401, 403), exc.code
     else:
