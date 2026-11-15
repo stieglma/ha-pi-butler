@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Update bundled XKNX Editor to 0.14.1 with Siemens plug-in configuration support, Health/History/Logs UI improvements and a fix for parameter bit sizing during downloads.
+- Pin the editor release source and verified archive checksum; retain the isolated runtime and existing xknxproject dependency pin.
+
 ## 1.2.0
 
 - Release the optional KNX Editor integration with admin-only ingress, isolated runtime, gateway firewall protection and automatically configured assistant tools.
