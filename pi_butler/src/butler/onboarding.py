@@ -77,6 +77,15 @@ async def read_bounded(reply, limit):
     return bytes(raw)
 
 
+async def read_bounded_request(request, limit):
+    raw = bytearray()
+    async for chunk in request.content.iter_chunked(65536):
+        raw.extend(chunk)
+        if len(raw) > limit:
+            raise ValueError('Request too large')
+    return bytes(raw)
+
+
 async def pi_request(client, method, path, **kwargs):
     async with client.request(method, 'http://127.0.0.1:8504' + path, allow_redirects=False, **kwargs) as reply:
         if reply.status != 200:
@@ -212,6 +221,24 @@ def create_app(onboarding, memory_path=MEMORY):
         except (ValueError, OSError) as error:
             return web.json_response({'error': str(error)}, status=400)
 
+    async def knx_exchange(request):
+        from .knx_repository import read_source, deliver_checkpoint
+        try:
+            options = normalize_options(json.loads(KNX_CONFIG.read_text()))
+            if not options['enabled']:
+                raise ValueError('KNX is disabled')
+            if request.path == '/knx-source':
+                raw = await asyncio.to_thread(read_source, options, workspace.ROOT / 'repository')
+                return web.Response(body=raw, content_type='application/octet-stream', headers={'Cache-Control': 'no-store'})
+            raw = await read_bounded_request(request, 130 * 1024 * 1024)
+            config = json.loads(workspace.CONFIG.read_text())
+            result = await asyncio.to_thread(deliver_checkpoint, raw, options, config)
+            return web.json_response(result)
+        except Exception:
+            return web.json_response({'error': 'KNX repository exchange failed. Check the configured source, Git status and delivery settings. Existing work is retained.'}, status=400)
+
+    app.router.add_get('/knx-source', knx_exchange)
+    app.router.add_post('/knx-deliver', knx_exchange)
     app.router.add_get('/status', status)
     app.router.add_get('/memory', memory)
     app.router.add_post('/memory', memory)

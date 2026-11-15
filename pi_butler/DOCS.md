@@ -482,46 +482,66 @@ outcomes, and correlates relevant entity history and available Core logs. It is
 read-only and reports missing or expired evidence rather than assuming success or
 failure. Configuration changes remain a separately requested task.
 
-## Optional KNX Editor (1.1.0-beta.1)
+## Optional KNX Editor (1.1.0-beta.2)
 
-Configure every gateway IP in `knx.gateway_addresses`, then enable `knx.enabled` and restart. **KNX Editor** appears in
-Butler's menu for verified HA administrators. Import a project copy using the UI;
-its private native files persist in `/data/knx`. The automatically configured
-`pi_butler_knx` MCP offers six project reads. `knx.read_enabled: false` denies
-assistant reads without restricting the privileged editor UI. Option changes
-require an app restart. Disabling retains data and removes the module entry/MCP.
+Configure every gateway IP in `knx.gateway_addresses`, enable `knx.enabled` and
+restart. Verified HA administrators see **KNX Editor** and **KNX projects & access**
+in Butler's menu. The editor and project tools use the same active project.
 
-This is an acceptance candidate: automatic Git checkpoints/exports and project
-rollback are not implemented. Do not treat it as the leading project store yet.
-HA backups now stop the app briefly to preserve SQLite consistency. The original
-project remains the fallback. See [implementation and HA test steps](../docs/KNX-EDITOR-IMPLEMENTATION.md)
-for the exact boundaries, missing features and unverified build/HA behavior.
+An existing manually imported `.xknx` in the editor's private projects folder is
+retained. The last native project reopens after restart; protected projects may ask
+for their password again. No password is stored by Butler. Disabling the module
+retains projects, checkpoints and permissions.
 
 Set `knx.repository_directory` (default `knx_editor`) and `knx.project_filename`
-(default `project.knxproj`) to identify the repository source. For example:
+(default `project.knxproj`) relative to the configured Git repository. Setup checks
+that exact source. **Import configured repository project** copies it into private
+staging and imports a separate native working project. Existing working projects
+are preserved. Repository files are never opened automatically as live projects.
+Password-protected exchange archives can still be imported through the editor UI.
 
-```yaml
-knx:
-  enabled: true
-  read_enabled: true
-  repository_directory: knx_editor
-  project_filename: project.knxproj
-  gateway_addresses:
-    - 192.0.2.10  # Replace with your real KNX/IP gateway address.
-```
+**KNX projects & access** provides:
 
-Paths are relative to the configured Git repository. Restart after changes.
-**Setup & house notes** checks for the exact file `knx_editor/project.knxproj`;
-set `project_filename` to your existing name if desired. This check does not
-validate its contents, import it, or synchronize it with the active editor project.
-Import a copy manually through KNX Editor; manual uploads accept any filename.
-The private working format is `.xknx`.
+- Automatic checkpoints of changed project state about every 30 seconds and on
+  project close, plus manual checkpoints with descriptions. A checkpoint contains
+  a consistent native `.xknx`, matching `.knxproj` export and SHA-256 metadata.
+- A checkpoint history with downloads, source and administrator identity when
+  available. Canvas UI changes are recorded as `editor`; no individual identity
+  is guessed for those changes. Incomplete exports are not published as checkpoints,
+  and their failure is shown in project status. The live working copy remains saved.
+- Restore of a checkpoint belonging to the active project, guarded against stale
+  project state and checksum failures. Current state is checkpointed before restore;
+  the restored state creates a new revision. This does not revert bus devices.
+- Explicit **Deliver this checkpoint to Git**, using the existing prepare/deliver
+  workflow, configured branches and push or pull request mode. It writes the configured
+  `.knxproj`, a sibling with `.xknx` extension and `checkpoint.json`. Dirty work is
+  preserved and delivery stops on conflicts/failure. Checkpoints remain available
+  privately if Git delivery fails. Commits are not pushed automatically on each edit.
+- Assistant grants per project GUID and optionally device node IDs, for supported
+  add/change/delete operations. Empty device scope means the whole project. Writes
+  default to denied; parameter changes require change and delete rights because they
+  can remove links. Group-address-wide changes need a project-wide grant. Authorization
+  and mutation run in the same locked UI task, with checkpoints before and after. Normal queued UI device programming also requires a complete
+  checkpoint before starting; an export failure blocks that programming operation.
+
+The `pi_butler_knx` MCP retains its six reads and adds seven finite offline project
+writes: device rename, parameter changes, group address creation/rename/deletion,
+and communication object linking/unlinking. `knx.read_enabled` controls reads;
+write grants are managed separately in the administrator page. No generic dispatch,
+file path, settings, keyring, assistant bus write or assistant programming tool is
+exposed. The privileged editor retains its full UI operations.
+
+Exchange exports are unsigned; successful synthetic reimport does not prove ETS
+acceptance or support for the actual house's devices. Large imports/exports can
+pause the editor while its project lock is held. Checkpoints are retained until
+app data is removed; monitor storage usage. HA backups stop the app briefly for
+SQLite consistency. No original house-project or bus programming test was performed
+as part of this release.
 
 Exclude only the editor-only repository folder (`knx_editor/` by default) from
-restart-after-sync in the separate HA Git app. Keep `knx/` included in normal
-restart detection if it contains Home Assistant entity YAMLs. Pi Butler does not
-modify those restart rules. Private app storage `/data/knx` and the ingress URL
-`butler/knx/` are independent of the configured repository folder.
+restart-after-sync in the separate HA Git app. Keep `knx/` included if it contains
+Home Assistant entity YAMLs. Pi Butler does not modify those restart rules.
+
 
 
 The gateway list is required when enabling KNX. Include all real IPv4/IPv6 and

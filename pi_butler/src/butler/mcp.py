@@ -50,7 +50,7 @@ async def main():
     else:
         tools = TOOLS
     connector = UnixConnector(path='/run/butler/knx/read.sock' if knx else '/run/butler/access/access.sock')
-    async with ClientSession(connector=connector, timeout=ClientTimeout(total=30)) as session:
+    async with ClientSession(connector=connector, timeout=ClientTimeout(total=650 if knx else 30)) as session:
         while True:
             line = await asyncio.to_thread(sys.stdin.buffer.readline, 32770)
             if not line:

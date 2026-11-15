@@ -154,6 +154,8 @@ def check_changes(cwd):
     import ast
     import yaml
     for name in filter(None, changed):
+        if not name.endswith(('.yaml', '.yml', '.json', '.py', '.sh')):
+            continue
         # Validate the exact staged candidate, even when working tree differs.
         text = run('git', 'show', ':' + name, cwd=cwd, strip=False)
         try:

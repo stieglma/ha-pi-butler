@@ -27,10 +27,21 @@ def main():
     import json
     from editor_gui.web.server import WebHub
     from editor_gui.plugins.mcp import plugin
-    from editor_gui.main import main as editor_main
+    import editor_gui.main as editor
+    from .knx_runtime import Runtime, EditorApi
+    from .knx_projects import remembered_project
+    runtime = Runtime()
+    editor_main = editor.main
     credentials = json.loads(Path('/data/knx/credentials.json').read_text())
     original = WebHub.app
-    WebHub.app = lambda self: protected_app(original(self), credentials['web_token'])
+    WebHub.app = lambda self: EditorApi(protected_app(original(self), credentials['web_token']), runtime, credentials)
+    original_build = plugin.build_http_app
+    def build(ctx, auth):
+        runtime.attach(ctx)
+        return original_build(ctx, auth)
+    plugin.build_http_app = build
+    startup = editor.startup_file
+    editor.startup_file = lambda argv: startup(argv) or remembered_project(recent=editor.load_settings('app').get('recent_files', []))
     # UI settings must not turn the internal MCP endpoint into an unauthenticated
     # endpoint accessible from the agent. Force the supervisor-owned token.
     build_auth = plugin._build_auth

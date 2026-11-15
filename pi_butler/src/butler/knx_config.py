@@ -68,10 +68,10 @@ def project_source_check(options, repository):
         if not stat.S_ISREG(info.st_mode):
             raise ValueError('Not a regular project file')
         return {'state': 'ready', 'path': relative, 'automatic_import': False,
-                'help': f'Found {relative} in the repository. Not automatically imported or synchronized; upload/import a copy in KNX Editor.'}
+                'help': f'Found {relative} in the repository. Use KNX projects & access to import a separate working copy; existing editor projects are retained.'}
     except (OSError, ValueError):
         return {'state': 'pending', 'path': relative, 'automatic_import': False,
-                'help': f'Expected {relative} in the repository; missing, inaccessible or not a regular file without symlinks. Import into KNX Editor is manual.'}
+                'help': f'Expected {relative} in the repository; missing, inaccessible or not a regular file without symlinks. Import is an explicit action in KNX projects & access or the editor.'}
     finally:
         if descriptor is not None:
             os.close(descriptor)

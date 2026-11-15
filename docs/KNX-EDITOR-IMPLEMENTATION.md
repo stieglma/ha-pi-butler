@@ -1,4 +1,52 @@
-# KNX Editor: first HA acceptance build
+# KNX Editor: beta.2 project lifecycle
+
+Current candidate: `1.1.0-beta.2`. The earlier beta.1 implementation report below
+is retained as historical context. Its missing-feature statements are superseded
+by this section and the current [user documentation](../pi_butler/DOCS.md#optional-knx-editor-110-beta2).
+
+Implemented in beta.2: explicit admin repository import into a new private native
+project; adoption/reopening of existing manual imports; consistent paired native
+and exchange checkpoints with checksums, history/downloads and guarded restore;
+explicit Git delivery through existing prepare/deliver; seven finite offline MCP
+writes with default-deny grants by project GUID and optional device node IDs.
+
+Snapshots and export preparation run on the editor UI thread under the shared
+project/catalog lock. Export uses the snapshot, manufacturer bundle, module
+arguments, group-object trees and plugin transform from that same locked state.
+Only a complete pair is atomically published. Automatic checkpoints group changes
+about every 30 seconds and on close. They do not claim to record each intermediate
+canvas gesture or identify its HA user. Native event history is retained in the
+snapshot. Failed exports leave the working project available, prior checkpoints
+intact and an error visible. Checkpoints currently have no expiration policy.
+
+Repository reads run as Pi, with no-follow directory/file descriptors and a 64 MiB
+limit. Ingress streams the bytes to KNX-owned staging after verifying an HA admin.
+The privileged editor never follows a path into the agent-owned repository. Git
+exports travel in the opposite direction as an exact three-file checksummed bundle;
+only the unprivileged Pi service prepares/stages/delivers it. There is no watcher
+that overwrites agent repository edits or automatically pushes every mutation.
+
+The management API requires the private web credential; assistant mutations require
+the distinct MCP credential and are blocked at browser ingress. Admin POST requests
+require the settings header and JSON content type. Policy writes, checkpoints and
+restores run through the verified admin path. Assistant arguments are validated
+against a fixed schema; authorization and mutation share one UI task. Parameter
+changes require delete permission because object reconciliation can drop links.
+Normal queued UI device programming also requires a complete checkpoint before
+starting. A checkpoint/export failure returns a failed queue future before any bus
+operation starts. Before/after checkpoints surround assistant writes; a failed post-write export is returned
+explicitly as changed with a checkpoint error, never described as a rolled-back edit.
+
+Still outside the implemented finite assistant surface: bus writes/programming,
+generic project/device creation/deletion and arbitrary upstream tools. Full admin
+UI device programming stays available. No bus rollback is implied by project
+restore. Manufacturer/hardware compatibility, ETS acceptance, protected project
+password flows, real Supervisor behavior and final HA acceptance need target tests.
+Existing read-only MCP and editor loading were confirmed by the user in HA before
+this increment; that is not validation of the new release.
+
+## Historical beta.1 implementation report
+
 
 Prepared release: `1.1.0-beta.1`. This is an implementation candidate, not a
 validated HA release. The project file from the handoff has not been imported,

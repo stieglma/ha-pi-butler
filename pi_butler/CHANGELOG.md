@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0-beta.2
+
+- Add the administrator-only KNX projects & access page: import the configured repository project as a separate working copy, retain manual imports, and reopen the last native project after restart.
+- Create paired native/exchange checkpoints automatically for changed UI state, on close, around assistant writes, and before queued device programming. Add checksums, history/downloads, stale-state guarded restore and explicit Git delivery through the configured workflow.
+- Add seven finite offline MCP writes with project/device add/change/delete grants, denied by default. Parameter changes also require delete rights for implicit link removals.
+- Preserve failed checkpoints and Git delivery work visibly; skip binary artifacts during text syntax validation. Assistant bus writes/programming remain outside the finite tool surface.
+- Validate against synthetic pinned editor services and local Git repositories; actual house-project, ETS and bus acceptance remain open.
+
 ## 1.1.0-beta.1
 
 - Kernel-enforced KNX egress restrictions by service user, required gateway IP configuration, and fail-closed firewall startup. NET_ADMIN is used only for initialization and dropped before agents start; Protection mode remains enabled.

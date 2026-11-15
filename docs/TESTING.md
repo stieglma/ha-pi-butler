@@ -24,6 +24,25 @@ boundaries, Git preparation/delivery failure paths, setup/house notes and workfl
 launch contracts. Fake HA/forge responses and temporary bare repositories do not
 prove behavior with live services.
 
+## KNX beta.2 lifecycle checks
+
+The image CI now runs `knx_projects_smoke.py`, `knx_api_smoke.py` and
+`knx_runtime_smoke.py` using the separate pinned editor Python environment, in
+addition to its credential smoke. Run the runtime smoke only in a fresh disposable
+container: it creates synthetic files at `/data/knx` and launches the production
+headless editor twice as uid 1003 with `--no-connect`. It does not test the firewall
+or connect/program any bus device.
+
+Local beta.2 evidence: 112 Python unit/integration tests and 12 Node tests passed;
+the linux/amd64 image built under emulation and its 112 Python tests passed.
+Pinned editor synthetic tests cover paired export/reimport of a public fixture
+device, native reopen with an empty catalog, stale permission rejection,
+default-denied/granted writes, rollback, and a failed pre-programming checkpoint.
+The headless production launcher passed manual-project adoption, initial automatic
+checkpoint, denied mutation and reopening after process restart. Browser checks
+under an ingress prefix exercised permission save, checkpoint and restore, text
+escaping and a 390px layout. These are not live HA/ETS/house-device acceptance.
+
 ## Image and runtime checks
 
 On macOS with Colima, ensure the Docker CLI is on `PATH` and Colima is running.
