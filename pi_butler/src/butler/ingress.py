@@ -2,13 +2,16 @@
 import asyncio
 import json
 from pathlib import Path
+import re
+from urllib.parse import quote
 from .onboarding import read_bounded
-from aiohttp import ClientSession, ClientTimeout, UnixConnector, WSMsgType, web
+from aiohttp import ClientSession, ClientTimeout, DummyCookieJar, UnixConnector, WSMsgType, web
 
 # HA's documented ingress peer. Forwarded headers are never authentication.
 INGRESS_PEER = '172.30.32.2'
 CLIENT = web.AppKey('client', ClientSession)
 CATALOG_CLIENT = web.AppKey('catalog_client', ClientSession)
+KNX_CONFIG = web.AppKey('knx_config', dict)
 WORKSPACE_CLIENT = web.AppKey('workspace_client', ClientSession)
 WEB_ROOT = Path(__file__).parent / 'web'
 ASSET_TYPES = {'access.js': 'text/javascript', 'access-loader.js': 'text/javascript',
@@ -20,12 +23,35 @@ HOP = {'connection', 'upgrade', 'keep-alive', 'proxy-authenticate', 'proxy-autho
        'te', 'trailer', 'transfer-encoding', 'content-length'}
 
 
+async def knx_admin(request):
+    user_id = request.headers.get('X-Remote-User-Id', '')
+    if not re.fullmatch(r'[a-f0-9]{32}', user_id):
+        return False
+    try:
+        async with request.app[CATALOG_CLIENT].get('http://localhost/identity?user_id=' + user_id) as reply:
+            return reply.status == 200 and (await reply.json()).get('admin') is True
+    except Exception:
+        return False
+
+
 async def proxy(request):
     peer = request.transport.get_extra_info('peername')
     if not peer or peer[0] != INGRESS_PEER:
         raise web.HTTPForbidden(text='Home Assistant ingress required')
     # Older ingress_entry='/' produced a second slash after HA's prefix.
     path = '/' + request.path.lstrip('/')
+    knx = request.app.get(KNX_CONFIG, {'enabled': False})
+    editor = path == '/butler/knx' or path.startswith('/butler/knx/')
+    if editor:
+        if not knx['enabled']:
+            raise web.HTTPNotFound(text='KNX editor disabled')
+        if not await knx_admin(request):
+            raise web.HTTPForbidden(text='Home Assistant administrator verification required')
+        if path == '/butler/knx':
+            raise web.HTTPFound('knx/')
+        # Host integration and login are not browser-facing interfaces.
+        if path.removeprefix('/butler/knx/') in ('host', 'login'):
+            raise web.HTTPNotFound()
     if path == '/butler/starters/':
         if request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
@@ -101,11 +127,28 @@ async def proxy(request):
         except Exception:
             return web.json_response({'error': 'HA picker service is unavailable; retry after the app finishes starting.'}, status=502)
     headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP and not k.lower().startswith('x-forwarded-') and k.lower() != 'forwarded'}
+    if editor:
+        # Never accept a browser-supplied internal credential or cookie. Authenticate
+        # this hop independently of upstream's browser sessions.
+        headers = {k: v for k, v in headers.items() if k.lower() not in
+                   {'x-butler-knx-token', 'cookie', 'authorization', 'x-remote-user-id',
+                    'x-remote-user-name', 'x-remote-user-display-name'}}
+        headers['X-Butler-KNX-Token'] = knx['web_token']
+        headers['X-Forwarded-Host'] = request.host
     if request.method == 'GET' and path == '/':
         headers = {k: v for k, v in headers.items() if k.lower() not in {'if-none-match', 'if-modified-since'}}
         headers['Accept-Encoding'] = 'identity'
     # Preserve public Host and Origin for Pi Web's own Origin guard.
     url = 'http://127.0.0.1:8504' + '/' + request.rel_url.raw_path_qs.lstrip('/')
+    if editor:
+        # Re-encode the decoded tail so encoded separators/dot paths cannot escape
+        # the editor origin or route to another service.
+        tail = path.removeprefix('/butler/knx/')
+        if any(part in ('.', '..') for part in tail.split('/')) or '\\' in tail:
+            raise web.HTTPBadRequest()
+        url = 'http://127.0.0.1:8511/' + quote(tail, safe='/')
+        if request.query_string:
+            url += '?' + request.rel_url.raw_query_string
     client = request.app[CLIENT]
     if request.headers.get('Upgrade', '').lower() == 'websocket':
         protocols = [p.strip() for p in request.headers.get('Sec-WebSocket-Protocol', '').split(',') if p.strip()]
@@ -136,12 +179,17 @@ async def proxy(request):
         if request.method == 'GET' and path == '/' and upstream.status == 200 and upstream.content_type == 'text/html' and not upstream.headers.get('Content-Encoding'):
             body = await upstream.read()
             navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><nav id="butler-navigation" aria-label="Butler"><button id="butler-navigation-toggle" type="button" aria-label="Toggle Butler menu" aria-expanded="false" aria-controls="butler-navigation-links">+</button><div id="butler-navigation-links"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a><a href="butler/setup/" target="_blank" rel="noopener">Setup &amp; house notes</a><a id="butler-starters-link" href="butler/starters/" target="_blank" rel="noopener">Investigate your home</a></div></nav><script src="butler/assets/navigation.js" defer></script>'
+            if knx['enabled'] and await knx_admin(request):
+                navigation = navigation.replace(b'</div></nav>', b'<a href="butler/knx/" target="_blank" rel="noopener">KNX Editor</a></div></nav>')
             body = body.replace(b'</body>', navigation + b'</body>', 1)
             for key in list(response_headers):
                 if key.lower() in {'etag', 'last-modified'}:
                     del response_headers[key]
             response_headers['Cache-Control'] = 'no-store'
             return web.Response(body=body, status=upstream.status, headers=response_headers)
+        if editor:
+            response_headers = {k: v for k, v in response_headers.items() if k.lower() != 'set-cookie'}
+            response_headers['Cache-Control'] = 'no-store'
         response = web.StreamResponse(status=upstream.status, headers=response_headers)
         await response.prepare(request)
         async for chunk in upstream.content.iter_chunked(65536):
@@ -152,7 +200,8 @@ async def proxy(request):
 
 async def main():
     app = web.Application(client_max_size=16777216)
-    app[CLIENT] = ClientSession(timeout=ClientTimeout(total=None, sock_connect=10), auto_decompress=False, trust_env=False)
+    app[KNX_CONFIG] = json.loads(Path('/run/butler/knx-proxy.json').read_text())
+    app[CLIENT] = ClientSession(timeout=ClientTimeout(total=None, sock_connect=10), auto_decompress=False, trust_env=False, cookie_jar=DummyCookieJar())
     app[CATALOG_CLIENT] = ClientSession(connector=UnixConnector(path='/run/butler/admin/settings.sock'), timeout=ClientTimeout(total=30), trust_env=False)
     app[WORKSPACE_CLIENT] = ClientSession(connector=UnixConnector(path='/run/butler/workspace/ui.sock'), timeout=ClientTimeout(total=25), trust_env=False)
     app.router.add_route('*', '/{path:.*}', proxy)

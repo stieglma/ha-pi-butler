@@ -8,6 +8,8 @@ config = yaml.safe_load((root / 'config.yaml').read_text())
 assert config['arch'] == ['amd64']
 assert config['slug'] == 'pi_butler'
 assert config['ingress'] and config['homeassistant_api']
+assert config['panel_admin'] is True and config['backup'] == 'cold'
+assert config['options']['knx'] == {'enabled': False, 'read_enabled': True}
 assert config['hassio_role'] == 'homeassistant'
 assert not config.get('host_network') and not config.get('privileged') and not config.get('map')
 assert not config.get('ports')

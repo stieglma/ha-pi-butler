@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0-beta.1
+
+- Optional isolated KNX Editor admin UI, automatically registered finite read-only MCP tools, and configurable assistant read access.
+- Experimental HA acceptance build: automatic Git checkpoints, synchronized exports and rollback are not implemented yet. Keep an original project copy.
+
 ## 1.0.1
 
 - Collapse navigation buttons into a top-right “+” menu on small screens so they no longer cover the chat controls.

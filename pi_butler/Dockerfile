@@ -14,7 +14,9 @@ RUN test "$TARGETARCH" = amd64 \
     && groupmod -n pi node \
     && useradd -u 1001 -g 1100 -d /data/service -s /usr/sbin/nologin ha-access \
     && groupadd -g 1002 ingress \
-    && useradd -u 1002 -g 1002 -d /nonexistent -s /usr/sbin/nologin ingress
+    && useradd -u 1002 -g 1002 -d /nonexistent -s /usr/sbin/nologin ingress \
+    && groupadd -g 1003 knx \
+    && useradd -u 1003 -g 1003 -d /data/knx -s /usr/sbin/nologin knx
 FROM base AS node-dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make g++ \
@@ -45,7 +47,27 @@ WORKDIR /opt/python
 COPY pyproject.toml uv.lock ./
 RUN UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never \
     uv sync --locked --no-dev --no-install-project --python /usr/bin/python3 --no-cache
+# Independent, pinned editor environment; retain corresponding source and licenses.
+FROM base AS knx-dependencies
+COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /usr/local/bin/uv
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+ADD --checksum=sha256:755bf41c846dd593be0ae816aacb125de412ef1c364268c773b70a44d91e6059 https://codeload.github.com/XKNX/xknx-editor/tar.gz/b65edca16260b638cfea329b57b7034f100a09ad /tmp/editor.tar.gz
+RUN mkdir -p /opt/knx/source \
+    && tar -xzf /tmp/editor.tar.gz -C /opt/knx/source --strip-components=1 \
+    && rm /tmp/editor.tar.gz
+ENV UV_PYTHON_INSTALL_DIR=/opt/knx/python
+RUN uv python install 3.13.14 \
+    && UV_PROJECT_ENVIRONMENT=/opt/knx/venv uv sync --project /opt/knx/source --locked --no-dev --all-packages --no-editable --python 3.13.14 --no-cache
+# The git-pinned xknxproject dependency's corresponding source is retained too.
+ADD --checksum=sha256:96f2423a08d898d40da99163459506d27f9fb6a3edd99d13b83677805bcf9954 https://codeload.github.com/XKNX/xknxproject/tar.gz/f97db068884eca2b460abb1fb4db2262345f7f47 /opt/knx/xknxproject-source.tar.gz
+
 FROM base AS runtime
+COPY --from=knx-dependencies /opt/knx /opt/knx
+RUN apt-get update && apt-get install -y --no-install-recommends libx11-6 libxext6 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && /opt/knx/venv/bin/python -c "from editor_gui.web.server import WebHub; from editor_gui.main import main" \
+    && chmod -R go-w /opt/knx
 COPY --from=node-dependencies /opt/runtime /opt/runtime
 COPY --from=python-dependencies /opt/venv /opt/venv
 COPY --from=cli-dependencies /usr/local/bin/gh /usr/local/bin/gh

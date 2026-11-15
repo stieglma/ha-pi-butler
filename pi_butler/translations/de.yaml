@@ -1,4 +1,13 @@
 configuration:
+  knx:
+    name: KNX Editor (Beta)
+    description: Separater Admin-Editor. Änderungen werden noch nicht automatisch ins Git-Repository gesichert. Nach Änderungen der Optionen die App neu starten.
+    fields:
+      enabled:
+        name: KNX Editor aktivieren
+      read_enabled:
+        name: KNX-Projekt für den Assistenten lesbar
+        description: Nur lesende Projektwerkzeuge. Schreiben, Löschen und Buszugriff bleiben für den Assistenten gesperrt.
   repository:
     name: Konfigurations-Repository
     description: Optionaler, unabhängiger Git-Checkout. Anmeldung im Pi-Web-Terminal. Nach Änderungen die App neu starten.

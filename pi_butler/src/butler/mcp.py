@@ -6,7 +6,7 @@ from aiohttp import ClientSession, ClientTimeout, UnixConnector
 from .access import TOOLS
 
 
-async def dispatch(message, session):
+async def dispatch(message, session, tools=TOOLS):
     if not isinstance(message, dict) or message.get('jsonrpc') != '2.0' or not isinstance(message.get('method'), str):
         return {'jsonrpc': '2.0', 'id': message.get('id') if isinstance(message, dict) else None,
                 'error': {'code': -32600, 'message': 'Invalid request'}}
@@ -24,7 +24,7 @@ async def dispatch(message, session):
     elif method == 'ping':
         response['result'] = {}
     elif method == 'tools/list':
-        response['result'] = {'tools': TOOLS}
+        response['result'] = {'tools': tools}
     elif method == 'tools/call':
         try:
             async with session.post('http://localhost/call', json={'tool': params.get('name'), 'arguments': params.get('arguments', {})}) as reply:
@@ -44,7 +44,12 @@ async def dispatch(message, session):
 
 
 async def main():
-    connector = UnixConnector(path='/run/butler/access/access.sock')
+    knx = '--knx' in sys.argv
+    if knx:
+        from .knx import TOOLS as tools
+    else:
+        tools = TOOLS
+    connector = UnixConnector(path='/run/butler/knx/read.sock' if knx else '/run/butler/access/access.sock')
     async with ClientSession(connector=connector, timeout=ClientTimeout(total=30)) as session:
         while True:
             line = await asyncio.to_thread(sys.stdin.buffer.readline, 32770)
@@ -56,7 +61,7 @@ async def main():
                     while line and not line.endswith(b'\n'):
                         line = await asyncio.to_thread(sys.stdin.buffer.readline, 32770)
                     raise ValueError()
-                response = await dispatch(json.loads(line), session)
+                response = await dispatch(json.loads(line), session, tools)
             except (ValueError, TypeError):
                 response = {'jsonrpc': '2.0', 'id': None, 'error': {'code': -32700, 'message': 'Invalid or oversized JSON frame'}}
             if response is not None:

@@ -5,6 +5,7 @@ from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import resource
+import secrets
 import signal
 import subprocess
 import sys
@@ -15,7 +16,7 @@ from .access import redact
 from .permissions import DEFAULT, migrate_permissions
 from .workspace import validate_config
 
-PI, ACCESS, INGRESS, SHARED = 1000, 1001, 1002, 1100
+PI, ACCESS, INGRESS, KNX, SHARED = 1000, 1001, 1002, 1003, 1100
 STOP = threading.Event()
 
 
@@ -171,6 +172,9 @@ def prepare():
     legacy = options.get('ha_access')
     if legacy is None and previous.is_file() and not previous.is_symlink():
         legacy = json.loads(previous.read_text()).get('ha_access')
+    knx = options.setdefault('knx', {'enabled': False, 'read_enabled': True})
+    if set(knx) != {'enabled', 'read_enabled'} or any(type(v) is not bool for v in knx.values()):
+        raise RuntimeError('Invalid KNX options')
     validate_config(options['repository'])
     bounds = {'parallel_requests': (1, 16), 'response_bytes': (65536, 8388608),
               'log_lines': (1, 2000), 'retention_days': (1, 90), 'storage_megabytes': (256, 65536)}
@@ -196,6 +200,13 @@ def prepare():
     directory('/run/butler/pi', PI, PI, 0o700)
     directory('/run/butler/workspace', PI, INGRESS, 0o2750)
     directory('/run/butler/admin', ACCESS, INGRESS, 0o750)
+    directory('/data/knx', KNX, KNX, 0o700)
+    directory('/data/knx/projects', KNX, KNX, 0o700)
+    directory('/run/butler/knx', KNX, SHARED, 0o2750)
+    credentials = {'web_token': secrets.token_urlsafe(48), 'mcp_token': secrets.token_urlsafe(48)}
+    private_write('/data/knx/credentials.json', credentials, KNX, KNX, 0o600)
+    private_write('/etc/pi-butler/knx.json', knx, 0, 0, 0o644)
+    private_write('/run/butler/knx-proxy.json', {'enabled': knx['enabled'], 'web_token': credentials['web_token']}, 0, INGRESS, 0o640)
     private_write('/data/service/options.json', options, ACCESS, SHARED, 0o600)
     private_write('/etc/pi-butler/workspace.json', options['repository'], 0, 0, 0o644)
     private_write('/etc/pi-butler/limits.json', options['limits'], 0, 0, 0o644)
@@ -207,6 +218,12 @@ def prepare():
     mcp = json.loads(mcp_path.read_text()) if mcp_path.exists() else {'mcpServers': {}}
     mcp.setdefault('mcpServers', {}).setdefault('pi_butler', {
         'command': '/usr/local/bin/butler-mcp', 'description': 'Policy-controlled Home Assistant reads, actions and diagnostics'})
+    if knx['enabled']:
+        mcp['mcpServers']['pi_butler_knx'] = {
+            'command': '/usr/local/bin/butler-mcp', 'args': ['--knx'],
+            'description': 'Read-only KNX project tools; no bus writes or programming'}
+    else:
+        mcp['mcpServers'].pop('pi_butler_knx', None)
     private_write(str(mcp_path), mcp, PI, PI, 0o600)
     env = {'PATH': '/opt/runtime/node_modules/.bin:/opt/venv/bin:/usr/local/bin:/usr/bin:/bin',
            'HOME': '/data/home', 'USER': 'pi', 'LOGNAME': 'pi', 'SHELL': '/bin/bash',
@@ -255,6 +272,9 @@ def main():
                     STOP.set()
                 continue
             text = redact(raw.decode('utf-8', 'replace').rstrip(), token)
+            if name.startswith('knx-'):
+                for secret in json.loads(Path('/data/knx/credentials.json').read_text()).values():
+                    text = text.replace(secret, '[REDACTED]')
             log.info('%s %s', name, text)
             print(f'{name}: {text}', flush=True)
         pipe.close()
@@ -292,6 +312,17 @@ def main():
     service_env = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': '/opt/butler', 'HOME': '/data/service',
                    'SUPERVISOR_TOKEN': token, 'LANG': 'C.UTF-8'}
     spawn('access', [sys.executable, '-m', 'butler.access'], ACCESS, SHARED, [SHARED, INGRESS], service_env)
+    if options['knx']['enabled']:
+        knx_env = {'PATH': '/opt/knx/venv/bin:/usr/local/bin:/usr/bin:/bin',
+                   'PYTHONPATH': '/opt/butler', 'HOME': '/data/knx', 'LANG': 'C.UTF-8',
+                   'XDG_DATA_HOME': '/data/knx/data', 'XDG_CONFIG_HOME': '/data/knx/config',
+                   'XDG_CACHE_HOME': '/data/knx/cache', 'XDG_STATE_HOME': '/data/knx/state'}
+        spawn('knx-editor', ['/opt/knx/venv/bin/python', '-m', 'butler.knx_editor',
+              '--web=127.0.0.1:8511', '--web-no-browser', '--web-no-tray', '--web-trust-proxy',
+              '--web-proxy-ip=127.0.0.1', '--web-files=/data/knx/projects', '--no-connect',
+              '--mcp=127.0.0.1:8512'], KNX, KNX, [], knx_env)
+        spawn('knx-bridge', [sys.executable, '-m', 'butler.knx_bridge'],
+              KNX, KNX, [], knx_env)
     spawn('sessiond', ['pi-web-sessiond'], PI, PI, [SHARED], pi_env)
     spawn('web', ['pi-web-server'], PI, PI, [SHARED], pi_env)
     spawn('ingress', [sys.executable, '-m', 'butler.ingress'], INGRESS, INGRESS, [SHARED],

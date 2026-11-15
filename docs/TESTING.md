@@ -93,3 +93,15 @@ Also check from the actual Pi Web terminal; the probe is not exhaustive.
 Cache reuse measurements and Supervisor build-cache retention remain unmeasured
 optimization checks, not release acceptance requirements. CI cache import/export
 was deliberately skipped; optional download-cache mounts have not been implemented.
+
+
+## KNX acceptance candidate
+
+The optional KNX integration has separate [implementation and HA acceptance
+steps](KNX-EDITOR-IMPLEMENTATION.md). New unit tests cover active-admin identity,
+HTTP/WebSocket credentials, finite read tools and denied arguments. The synthetic
+`knx_mcp_smoke.py` checks pinned FastMCP JSON/SSE framing and bearer authentication
+without opening a project or GUI. The container smoke now also enables KNX and
+checks process startup/private boundaries; that expanded container run remains
+unexecuted locally because Docker is unavailable. Original-project import, export,
+HA ingress, bus connectivity and device support have no acceptance evidence yet.

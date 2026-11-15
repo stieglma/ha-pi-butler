@@ -82,6 +82,52 @@ test "$(docker exec "$container_name" curl -s -o /dev/null -w '%{http_code}' htt
 docker stop -t 15 "$container_name"
 test "$(docker inspect -f '{{.State.ExitCode}}' "$container_name")" = 0
 
+# Enable KNX on the same volume: process startup and credential boundaries only.
+# No user project, browser session, automatic bus connection or programming.
+docker run --rm --entrypoint /opt/venv/bin/python3 -v "$task_volume:/data" pi-butler:test -c '
+import json
+from pathlib import Path
+p = Path("/data/options.json")
+options = json.loads(p.read_text())
+options["knx"] = {"enabled": True, "read_enabled": True}
+p.write_text(json.dumps(options))
+'
+docker start "$container_name"
+for attempt in $(seq 1 60); do
+  if [ "$(docker exec "$container_name" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8511/ || true)" = 403 ]; then break; fi
+  sleep 1
+done
+test "$(docker exec "$container_name" curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8511/)" = 403
+docker exec "$container_name" test -S /run/butler/knx/read.sock
+docker exec "$container_name" setpriv --reuid 1000 --regid 1000 --groups 1100 \
+  --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
+  /opt/venv/bin/python3 /tests/boundary_probe.py
+docker exec "$container_name" /opt/venv/bin/python3 -c '
+import json, urllib.request, urllib.error
+from pathlib import Path
+mcp = json.loads(Path("/data/pi/mcp.json").read_text())["mcpServers"]
+assert mcp["pi_butler_knx"]["args"] == ["--knx"]
+for port, route in [(8511, "/"), (8511, "/upload"), (8511, "/files/key/file"), (8512, "/mcp")]:
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}{route}")
+    except urllib.error.HTTPError as exc:
+        assert exc.code in (401, 403), exc.code
+    else:
+        raise AssertionError("Internal editor route is unprotected")
+'
+docker stop -t 15 "$container_name"
+test "$(docker inspect -f '{{.State.ExitCode}}' "$container_name")" = 0
+# Disable after restart; the private project directory remains intact.
+docker run --rm --entrypoint /opt/venv/bin/python3 -v "$task_volume:/data" pi-butler:test -c '
+import json
+from pathlib import Path
+p = Path("/data/options.json")
+options = json.loads(p.read_text())
+options["knx"]["enabled"] = False
+p.write_text(json.dumps(options))
+assert Path("/data/knx/projects").is_dir()
+'
+
 # A sparse file exercises the configured logical-byte limit without filling disk.
 docker run --rm --entrypoint /opt/venv/bin/python3 -v "$task_volume:/data" pi-butler:test -c '
 import json

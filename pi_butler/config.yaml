@@ -1,5 +1,5 @@
 name: Pi Butler
-version: 1.0.1
+version: 1.1.0-beta.1
 slug: pi_butler
 description: Persistent Pi Coding Agent workspace with policy-controlled Home Assistant tools
 url: https://github.com/stieglma/ha-pi-butler
@@ -7,6 +7,8 @@ arch: [amd64]
 homeassistant: "2026.11.1"
 startup: application
 boot: auto
+backup: cold
+panel_admin: true
 init: false
 ingress: true
 ingress_port: 8099
@@ -15,6 +17,9 @@ homeassistant_api: true
 hassio_api: true
 hassio_role: homeassistant
 options:
+  knx:
+    enabled: false
+    read_enabled: true
   repository:
     url: ""
     checkout_branch: main
@@ -32,6 +37,9 @@ options:
     retention_days: 7
     storage_megabytes: 4096
 schema:
+  knx:
+    enabled: bool
+    read_enabled: bool
   repository:
     url: str
     checkout_branch: str

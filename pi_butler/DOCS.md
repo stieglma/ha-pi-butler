@@ -481,3 +481,18 @@ the last five retained runs by default, explains conditions, branches and action
 outcomes, and correlates relevant entity history and available Core logs. It is
 read-only and reports missing or expired evidence rather than assuming success or
 failure. Configuration changes remain a separately requested task.
+
+## Optional KNX Editor (1.1.0-beta.1)
+
+Enable `knx.enabled` in app configuration and restart. **KNX Editor** appears in
+Butler's menu for verified HA administrators. Import a project copy using the UI;
+its private native files persist in `/data/knx`. The automatically configured
+`pi_butler_knx` MCP offers six project reads. `knx.read_enabled: false` denies
+assistant reads without restricting the privileged editor UI. Option changes
+require an app restart. Disabling retains data and removes the module entry/MCP.
+
+This is an acceptance candidate: automatic Git checkpoints/exports and project
+rollback are not implemented. Do not treat it as the leading project store yet.
+HA backups now stop the app briefly to preserve SQLite consistency. The original
+project remains the fallback. See [implementation and HA test steps](../docs/KNX-EDITOR-IMPLEMENTATION.md)
+for the exact boundaries, missing features and unverified build/HA behavior.
