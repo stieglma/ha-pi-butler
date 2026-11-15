@@ -438,6 +438,56 @@ class KnxDeliveryTests(unittest.TestCase):
             self.assertEqual((repo / 'interactive.txt').read_text(), 'keep interactive edit')
             self.assertEqual(original_run('git', '--git-dir', str(self.remote), 'rev-parse', 'deploy'), remote_before)
 
+    def test_delivery_cleanup_preserves_failed_or_concurrently_changed_work(self):
+        from butler import workspace
+        files = {'project.xknx': b'native', 'project.knxproj': b'export'}
+        meta = {'created': 'test', 'sha256': {n: hashlib.sha256(v).hexdigest() for n, v in files.items()}}
+        raw = io.BytesIO()
+        with zipfile.ZipFile(raw, 'w') as archive:
+            for name, data in files.items():
+                archive.writestr(name, data)
+            archive.writestr('checkpoint.json', json.dumps(meta))
+        original_deliver = workspace.deliver
+        for mode in ('push', 'pull_request'):
+            config = {**self.config, 'delivery': mode}
+            for outcome in ('clean', 'dirty', 'ignored', 'advanced', 'failed'):
+                with self.subTest(mode=mode, outcome=outcome):
+                    prepared = []
+                    original_prepare = workspace.worktree
+                    def prepare(*args):
+                        value = original_prepare(*args)
+                        prepared.append(value)
+                        return value
+                    def deliver(*args, **kwargs):
+                        if outcome == 'failed':
+                            raise workspace.WorkspaceError('Publication failed')
+                        result = original_deliver(*args, **kwargs)
+                        root = Path(prepared[0]['path'])
+                        if outcome in ('dirty', 'ignored'):
+                            (root / 'keep.txt').write_text('concurrent edit')
+                            if outcome == 'ignored':
+                                exclude = workspace.run('git', 'rev-parse', '--git-path', 'info/exclude', cwd=root)
+                                with Path(exclude).open('a') as stream:
+                                    stream.write('\nkeep.txt\n')
+                        elif outcome == 'advanced':
+                            workspace.run('git', 'commit', '--allow-empty', '-m', 'concurrent commit', cwd=root)
+                        return result
+                    with patch.object(workspace, 'validate_config', side_effect=lambda value: value), \
+                            patch.object(workspace, 'worktree', side_effect=prepare), \
+                            patch.object(workspace, 'deliver', side_effect=deliver), \
+                            patch.object(workspace, 'forge_delivery', return_value='https://example.com/pr/1'):
+                        if outcome == 'failed':
+                            with self.assertRaises(ValueError):
+                                deliver_checkpoint(raw.getvalue(), {}, config)
+                        else:
+                            result = deliver_checkpoint(raw.getvalue(), {}, config)
+                            self.assertEqual('cleanup_warning' in result, outcome != 'clean')
+                    root = Path(prepared[0]['path'])
+                    self.assertEqual(root.exists(), outcome != 'clean')
+                    branches = workspace.run('git', 'for-each-ref', '--format=%(refname:short)',
+                                             'refs/heads/', cwd=workspace.ROOT / 'repository').splitlines()
+                    self.assertEqual(prepared[0]['branch'] in branches, outcome != 'clean')
+
     def test_binary_checkpoint_delivery_and_preservation_of_unrelated_work(self):
         private = self.root / 'private'
         (private / 'projects').mkdir(parents=True)

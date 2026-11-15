@@ -119,7 +119,29 @@ def deliver_checkpoint(raw, options, config):
         if staged - set(paths):
             raise ValueError('Other staged changes appeared during KNX delivery; checkout retained for review')
         try:
-            return workspace.deliver(config, root, 'KNX checkpoint: ' + str(meta.get('comment') or meta['created'])[:200],
+            result = workspace.deliver(config, root, 'KNX checkpoint: ' + str(meta.get('comment') or meta['created'])[:200],
                                      expected_blobs=expected_blobs)
         except Exception as exc:
             raise ValueError('Git delivery failed; checkpoint and prepared checkout are retained. Inspect repository status before retrying.') from exc
+        # Cleanup is best effort after confirmed publication. Git's non-forced
+        # removal preserves dirty worktrees; check ignored files explicitly too.
+        repo = workspace.ROOT / 'repository'
+        try:
+            if workspace.run('git', 'rev-parse', 'HEAD', cwd=root) != result['commit']:
+                raise workspace.WorkspaceError('Checkout advanced after publication')
+            if workspace.run('git', 'status', '--porcelain', '--ignored', '--untracked-files=all', cwd=root):
+                raise workspace.WorkspaceError('Checkout contains concurrent edits')
+            workspace.run('git', 'worktree', 'remove', str(root), cwd=repo)
+        except workspace.WorkspaceError:
+            result['cleanup_warning'] = 'Published successfully; prepared checkout retained because cleanup was unsafe or failed.'
+            return result
+        # Use the published remote branch as the merge check, including PR heads.
+        # Never force deletion: Git also refuses branches checked out elsewhere.
+        target = config['destination_branch'] if config['delivery'] == 'push' else prepared['branch']
+        try:
+            workspace.run('git', '-c', f"branch.{prepared['branch']}.remote=origin",
+                          '-c', f"branch.{prepared['branch']}.merge=refs/heads/{target}",
+                          'branch', '-d', prepared['branch'], cwd=repo)
+        except workspace.WorkspaceError:
+            result['cleanup_warning'] = 'Published successfully and removed checkout; local branch retained because safe deletion failed.'
+        return result
