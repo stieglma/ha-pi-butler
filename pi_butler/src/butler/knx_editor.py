@@ -35,7 +35,9 @@ def main():
     # endpoint accessible from the agent. Force the supervisor-owned token.
     build_auth = plugin._build_auth
     plugin._build_auth = lambda token='': build_auth(credentials['mcp_token'])
-    os.environ['XKNX_MCP_AUTH_TOKEN'] = credentials['mcp_token']
+    # Upstream renders this environment variable in UI client-registration commands.
+    # Authentication stays in the closure above, including after settings restarts.
+    os.environ.pop('XKNX_MCP_AUTH_TOKEN', None)
     editor_main()
 
 

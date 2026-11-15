@@ -52,6 +52,7 @@ docker run --rm --entrypoint /opt/venv/bin/python3 -v "$PWD/pi_butler/tests:/tes
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/plugin_smoke.mjs
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/marketplace_smoke.mjs
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/model_status_smoke.mjs
+docker run --rm --entrypoint /opt/knx/venv/bin/python -e PYTHONPATH=/source -v "$PWD/pi_butler/src:/source:ro" -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/knx_editor_auth_smoke.py
 uv run --project pi_butler --locked bash pi_butler/tests/firewall_smoke.sh
 uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
 ```
@@ -118,7 +119,11 @@ The optional KNX integration has separate [implementation and HA acceptance
 steps](KNX-EDITOR-IMPLEMENTATION.md). Unit tests cover active-admin identity,
 HTTP/WebSocket credentials, finite reads, source paths, gateway IP validation,
 and fail-closed firewall setup. `knx_mcp_smoke.py` checks pinned FastMCP JSON/SSE
-framing and authentication without a project or GUI.
+framing and authentication without a project or GUI. `knx_editor_auth_smoke.py`
+runs the production launcher and pinned editor plugin, checks that the managed
+UI token accessor cannot disclose the supervisor credential, and verifies that
+only that credential authenticates after restarts with empty or user-supplied
+settings tokens. It uses loopback only, without a project, GUI session or bus.
 
 The earlier source-location build passed 98 container unit tests, package/runtime
 smokes and full app smoke locally and in CI. Do not apply that evidence to the
