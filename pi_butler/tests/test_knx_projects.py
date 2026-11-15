@@ -1,8 +1,11 @@
 import io
+import hashlib
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import shutil
 import tempfile
+import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -38,7 +41,10 @@ class ProjectTests(unittest.TestCase):
         self.assertFalse(self.projects.status()['dirty'])
         folder, meta = self.projects.find(made['id'])
         self.assertEqual(digest(folder / 'project.xknx'), meta['sha256']['project.xknx'])
-        files, manifest = unpack_checkpoint((folder / 'checkpoint.zip').read_bytes())
+        download = self.root / 'download.zip'
+        self.projects.download(made['id'], 'zip', download)
+        files, manifest = unpack_checkpoint(download.read_bytes())
+        self.assertFalse((folder / 'checkpoint.zip').exists())
         self.assertEqual(manifest['id'], made['id'])
         self.assertEqual(files['project.knxproj'], b'native state')
         self.assertNotIn('path', manifest)
@@ -60,6 +66,78 @@ class ProjectTests(unittest.TestCase):
         self.assertTrue(status['error'])
         self.assertEqual([r['id'] for r in status['checkpoints']], [first['id']])
         self.assertFalse(any(p.name.startswith('.pending-') for p in self.projects.folder.iterdir()))
+
+    def test_checkpoint_history_is_bounded_by_bytes_count_and_age(self):
+        self.project.path.write_bytes(b'x' * 1024)
+        self.projects.checkpoint_budget = 6500
+        self.projects.max_checkpoints = 3
+        for index in range(10):
+            self.project.state_key = lambda index=index: str(index)
+            self.projects.checkpoint()
+            status = self.projects.status()
+            self.assertLessEqual(status['storage']['bytes'], 6500)
+            self.assertLessEqual(len(status['checkpoints']), 3)
+            self.assertFalse(status['dirty'])
+        self.assertEqual(len(self.projects.entries()), 2)
+        self.projects.max_checkpoints = 1
+        self.projects.prune()
+        self.assertEqual(len(self.projects.entries()), 1)
+        first = self.projects.entries()[0]
+        path = self.projects.folder / first['id'] / 'checkpoint.json'
+        first['created'] = '2000-01-01T00:00:00+00:00'
+        path.write_text(json.dumps(first))
+        self.projects.prune()
+        self.assertEqual(len(self.projects.entries()), 1, 'Newest recovery point survives aging')
+        self.project.state_key = lambda: 'fresh'
+        self.projects.checkpoint()
+        self.assertFalse(path.exists(), 'Expired checkpoint removed once a newer recovery point exists')
+
+    def test_default_count_limit_keeps_the_latest_ten_checkpoints(self):
+        made = []
+        for index in range(12):
+            self.project.state_key = lambda index=index: str(index)
+            made.append(self.projects.checkpoint()['id'])
+        self.assertEqual([row['id'] for row in self.projects.entries()], list(reversed(made[-10:])))
+        self.assertFalse((self.projects.folder / made[0]).exists())
+        self.assertFalse((self.projects.folder / made[1]).exists())
+
+    def test_restore_source_and_download_copy_survive_pruning(self):
+        first = self.projects.checkpoint()
+        download = self.root / 'download.xknx'
+        self.projects.download(first['id'], 'xknx', download)
+        self.projects.max_checkpoints = 1
+        self.project.state_key = lambda: 'second'
+        self.projects.checkpoint(protected=(first['id'],))
+        self.assertEqual(len(self.projects.entries()), 2, 'Restore can pin its source until replacement')
+        self.projects.prune()
+        self.assertEqual(len(self.projects.entries()), 1)
+        self.assertFalse((self.projects.folder / first['id']).exists())
+        self.assertEqual(download.read_bytes(), b'native state')
+
+    def test_oversized_or_capacity_denied_checkpoint_keeps_recovery_point(self):
+        first = self.projects.checkpoint()
+        self.project.state_key = lambda: 'new'
+        self.projects.checkpoint_budget = 1
+        with self.assertRaisesRegex(ValueError, 'storage budget'):
+            self.projects.checkpoint()
+        self.assertEqual(self.projects.entries()[0]['id'], first['id'])
+        self.assertIn('Increase storage_megabytes', self.projects.error)
+        self.projects.checkpoint_budget = 512 * 1048576
+        with patch('butler.knx_projects.shutil.disk_usage', return_value=SimpleNamespace(free=0)), \
+                patch.object(self.projects, '_snapshot') as snapshot:
+            with self.assertRaisesRegex(ValueError, 'Not enough storage'):
+                self.projects.checkpoint()
+            snapshot.assert_not_called()
+        self.assertEqual(self.projects.entries()[0]['id'], first['id'])
+        self.assertFalse(any(p.name.startswith('.pending-') for p in self.projects.folder.iterdir()))
+
+    def test_legacy_duplicate_zip_is_removed(self):
+        first = self.projects.checkpoint()
+        legacy = self.projects.folder / first['id'] / 'checkpoint.zip'
+        legacy.write_bytes(b'redundant archive')
+        self.projects.prune()
+        self.assertFalse(legacy.exists())
+        self.projects.find(first['id'])
 
     def test_cross_project_and_corrupt_checkpoints_cannot_restore(self):
         first = self.projects.checkpoint()
@@ -137,6 +215,51 @@ class KnxDeliveryTests(unittest.TestCase):
     setUp = test_workspace.WorkspaceTests.setUp
     tearDown = test_workspace.WorkspaceTests.tearDown
     # Inherit the temporary bare-remote setup, not all workspace tests.
+    def test_concurrent_push_deliveries_publish_the_requested_checkpoint(self):
+        from butler import workspace
+        def bundle(label):
+            files = {'project.xknx': label.encode(), 'project.knxproj': ('export ' + label).encode()}
+            meta = {'created': label, 'sha256': {n: hashlib.sha256(v).hexdigest() for n, v in files.items()}}
+            raw = io.BytesIO()
+            with zipfile.ZipFile(raw, 'w') as archive:
+                for name, data in files.items():
+                    archive.writestr(name, data)
+                archive.writestr('checkpoint.json', json.dumps(meta))
+            return raw.getvalue()
+
+        first_prepared, release_first, second_started, second_prepared = (threading.Event() for _ in range(4))
+        original_prepare = workspace.prepare
+        def prepare(config, name):
+            result = original_prepare(config, name)
+            if not first_prepared.is_set():
+                first_prepared.set()
+                if not release_first.wait(5):
+                    raise AssertionError('First delivery was not released')
+            else:
+                second_prepared.set()
+            return result
+        def second():
+            second_started.set()
+            return deliver_checkpoint(bundle('B'), {}, self.config)
+
+        with patch.object(workspace, 'validate_config', side_effect=lambda value: value), \
+                patch.object(workspace, 'prepare', side_effect=prepare), \
+                ThreadPoolExecutor(max_workers=2) as pool:
+            a = pool.submit(deliver_checkpoint, bundle('A'), {}, self.config)
+            try:
+                self.assertTrue(first_prepared.wait(5))
+                b = pool.submit(second)
+                self.assertTrue(second_started.wait(5))
+                self.assertFalse(second_prepared.wait(0.1), 'Second preparation escaped the transaction lock')
+            finally:
+                release_first.set()
+            results = [a.result(timeout=10), b.result(timeout=10)]
+        self.assertNotEqual(results[0]['commit'], results[1]['commit'])
+        for label, result in zip(('A', 'B'), results):
+            for name, expected in [('project.xknx', label), ('project.knxproj', 'export ' + label)]:
+                self.assertEqual(workspace.run('git', '--git-dir', str(self.remote), 'show',
+                    result['commit'] + ':knx_editor/' + name), expected)
+
     def test_binary_checkpoint_delivery_and_preservation_of_unrelated_work(self):
         private = self.root / 'private'
         (private / 'projects').mkdir(parents=True)
@@ -147,7 +270,9 @@ class KnxDeliveryTests(unittest.TestCase):
         projects=Projects(SimpleNamespace(api=SimpleNamespace(project=project)), private,
             snapshot=shutil.copyfile,export=lambda src,dst:(dst.write_bytes(b'\xffPK export'),[])[1])
         checkpoint=projects.checkpoint('Delivery')
-        raw=(projects.folder/checkpoint['id']/'checkpoint.zip').read_bytes()
+        download=private/'download.zip'
+        projects.download(checkpoint['id'], 'zip', download)
+        raw=download.read_bytes()
         with patch('butler.workspace.validate_config', side_effect=lambda value: value):
             result=deliver_checkpoint(raw,{},self.config)
         repo=self.root/'workspaces/repository'

@@ -104,7 +104,7 @@ class Runtime:
                 policy = normalize_policy({'grants': body['grants']})
                 atomic_json(self.root / 'permissions.json', policy)
                 self.audit.info('KNX permissions updated by admin %s', actor)
-                return {'policy': policy}
+                return {'policy': policy, 'policy_version': self.policy_version()}
             if action == 'checkpoint':
                 if set(body) != {'comment'} or not isinstance(body['comment'], str) or len(body['comment']) > 500:
                     raise ValueError('Expected a comment of at most 500 characters')
@@ -181,6 +181,7 @@ class EditorApi:
         from starlette.requests import Request
         request = Request(scope, receive)
         action = 'assistant' if assistant else path.removeprefix('/butler-api/')
+        download_tmp = None
         try:
             method = 'GET' if action in ('status', 'download') else 'POST'
             if request.method != method:
@@ -189,10 +190,12 @@ class EditorApi:
                 ident, kind = request.query_params.get('id'), request.query_params.get('kind')
                 if kind not in ('xknx', 'knxproj', 'json', 'zip'):
                     raise ValueError('Invalid checkpoint format')
-                folder, meta = await asyncio.to_thread(self.runtime.ctx.run_locked,
-                    lambda: self.runtime.projects.find(ident))
                 name = 'checkpoint.' + kind if kind in ('json', 'zip') else 'project.' + kind
-                response = FileResponse(folder / name, filename=name, headers={'Cache-Control': 'no-store'})
+                download_tmp = tempfile.TemporaryDirectory(prefix='butler-download-')
+                destination = Path(download_tmp.name) / name
+                await asyncio.to_thread(self.runtime.ctx.run_locked,
+                    lambda: self.runtime.projects.download(ident, kind, destination))
+                response = FileResponse(destination, filename=name, headers={'Cache-Control': 'no-store'})
             elif action == 'import':
                 # Stream directly into KNX-owned private staging. Never give the
                 # privileged editor a path in the agent-writable repository.
@@ -226,4 +229,8 @@ class EditorApi:
             self.runtime.audit.error('KNX action failed: %s', action)
             response = JSONResponse({'error': 'KNX operation failed. Existing projects/checkpoints are retained. Check the editor for import/password or export errors.'}, status_code=502)
         response.headers['Cache-Control'] = 'no-store'
-        await response(scope, receive, send)
+        try:
+            await response(scope, receive, send)
+        finally:
+            if download_tmp is not None:
+                download_tmp.cleanup()

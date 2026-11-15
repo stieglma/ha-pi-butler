@@ -83,7 +83,9 @@ def main():
             assert len(runtime.tools['project_list_devices']()['items']) == 1
             assert len(runtime.projects.entries()) == 4
             folder, meta = runtime.projects.find(first['id'])
-            files, _ = unpack_checkpoint((folder / 'checkpoint.zip').read_bytes())
+            download = root / 'download.zip'
+            runtime.projects.download(first['id'], 'zip', download)
+            files, _ = unpack_checkpoint(download.read_bytes())
             assert files['project.xknx']
             queue = SimpleNamespace(_start=Mock(return_value='would-start'))
             runtime.guard_program_queue(queue)

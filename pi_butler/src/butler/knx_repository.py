@@ -62,55 +62,57 @@ def deliver_checkpoint(raw, options, config):
     options = normalize_options(options)
     config = workspace.validate_config(config)
     files, meta = unpack_checkpoint(raw)
-    prepared = workspace.prepare(config, 'knx-' + uuid.uuid4().hex[:12])
-    root = Path(prepared['path'])
-    # Refuse any concurrent/existing changes before replacing exact delivery files.
-    if workspace.run('git', 'status', '--porcelain', cwd=root):
-        raise ValueError('Prepared checkout changed elsewhere; delivery stopped')
-    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    paths = []
-    try:
-        for part in options['repository_directory'].split('/'):
-            try:
-                os.mkdir(part, 0o700, dir_fd=fd)
-            except FileExistsError:
-                pass
-            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
-            os.close(fd)
-            fd = child
-        names = {'project.knxproj': options['project_filename'],
-                 'project.xknx': options['project_filename'][:-8] + '.xknx',
-                 'checkpoint.json': 'checkpoint.json'}
-        # Refuse symlink destinations, including existing project exports.
-        for name in names.values():
-            try:
-                info = os.stat(name, dir_fd=fd, follow_symlinks=False)
-                if not stat.S_ISREG(info.st_mode):
-                    raise ValueError('Delivery destination must be a regular file')
-            except FileNotFoundError:
-                pass
-        for source, name in names.items():
-            temporary = '.checkpoint-' + uuid.uuid4().hex
-            output = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=fd)
-            try:
-                with os.fdopen(output, 'wb') as stream:
-                    stream.write(files[source])
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                os.rename(temporary, name, src_dir_fd=fd, dst_dir_fd=fd)
-            finally:
+    # One transaction covers preparation, artifact replacement, staging and push.
+    with workspace.locked():
+        prepared = workspace.prepare(config, 'knx-' + uuid.uuid4().hex[:12])
+        root = Path(prepared['path'])
+        # Refuse any concurrent/existing changes before replacing exact delivery files.
+        if workspace.run('git', 'status', '--porcelain', cwd=root):
+            raise ValueError('Prepared checkout changed elsewhere; delivery stopped')
+        fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        paths = []
+        try:
+            for part in options['repository_directory'].split('/'):
                 try:
-                    os.unlink(temporary, dir_fd=fd)
+                    os.mkdir(part, 0o700, dir_fd=fd)
+                except FileExistsError:
+                    pass
+                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            names = {'project.knxproj': options['project_filename'],
+                     'project.xknx': options['project_filename'][:-8] + '.xknx',
+                     'checkpoint.json': 'checkpoint.json'}
+            # Refuse symlink destinations, including existing project exports.
+            for name in names.values():
+                try:
+                    info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                    if not stat.S_ISREG(info.st_mode):
+                        raise ValueError('Delivery destination must be a regular file')
                 except FileNotFoundError:
                     pass
-            paths.append(options['repository_directory'] + '/' + name)
-    finally:
-        os.close(fd)
-    workspace.run('git', 'add', '--', *paths, cwd=root)
-    staged = set(filter(None, workspace.run('git', 'diff', '--cached', '--name-only', '-z', cwd=root).split('\0')))
-    if staged - set(paths):
-        raise ValueError('Other staged changes appeared during KNX delivery; checkout retained for review')
-    try:
-        return workspace.deliver(config, root, 'KNX checkpoint: ' + str(meta.get('comment') or meta['created'])[:200])
-    except Exception as exc:
-        raise ValueError('Git delivery failed; checkpoint and prepared checkout are retained. Inspect repository status before retrying.') from exc
+            for source, name in names.items():
+                temporary = '.checkpoint-' + uuid.uuid4().hex
+                output = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=fd)
+                try:
+                    with os.fdopen(output, 'wb') as stream:
+                        stream.write(files[source])
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.rename(temporary, name, src_dir_fd=fd, dst_dir_fd=fd)
+                finally:
+                    try:
+                        os.unlink(temporary, dir_fd=fd)
+                    except FileNotFoundError:
+                        pass
+                paths.append(options['repository_directory'] + '/' + name)
+        finally:
+            os.close(fd)
+        workspace.run('git', 'add', '--', *paths, cwd=root)
+        staged = set(filter(None, workspace.run('git', 'diff', '--cached', '--name-only', '-z', cwd=root).split('\0')))
+        if staged - set(paths):
+            raise ValueError('Other staged changes appeared during KNX delivery; checkout retained for review')
+        try:
+            return workspace.deliver(config, root, 'KNX checkpoint: ' + str(meta.get('comment') or meta['created'])[:200])
+        except Exception as exc:
+            raise ValueError('Git delivery failed; checkpoint and prepared checkout are retained. Inspect repository status before retrying.') from exc

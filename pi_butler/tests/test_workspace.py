@@ -194,3 +194,20 @@ class WorkspaceTests(unittest.TestCase):
         w.run('git', 'add', '.', cwd=task)
         with self.assertRaises(w.WorkspaceError):
             w.check_changes(task)
+
+    def test_renamed_modified_file_is_validated_before_delivery(self):
+        repo = w.ROOT / 'repository'
+        original = repo / 'old.py'
+        original.write_text(''.join(f'value_{i} = {i}\n' for i in range(30)))
+        w.run('git', 'add', 'old.py', cwd=repo)
+        w.deliver(self.config, repo, 'add source')
+        before = w.run('git', '--git-dir', str(self.remote), 'rev-parse', 'deploy')
+        w.run('git', 'mv', 'old.py', ' renamed.py', cwd=repo)
+        original_text = ''.join(f'value_{i} = {i}\n' for i in range(30)) + 'def broken(:\n'
+        (repo / ' renamed.py').write_text(original_text)
+        w.run('git', 'add', '--', ' renamed.py', cwd=repo)
+        self.assertTrue(w.run('git', 'diff', '--cached', '--name-status', cwd=repo).startswith('R'))
+        with self.assertRaisesRegex(w.WorkspaceError, 'Syntax check failed'):
+            w.deliver(self.config, repo, 'rename with invalid syntax')
+        self.assertEqual(w.run('git', '--git-dir', str(self.remote), 'rev-parse', 'deploy'), before)
+        self.assertEqual((repo / ' renamed.py').read_text(), original_text)

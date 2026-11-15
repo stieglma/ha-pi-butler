@@ -10,12 +10,19 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+import time
 from datetime import datetime, timezone
 import uuid
 import zipfile
 
+from .maintenance import storage_bytes
+
 ROOT = Path('/data/knx')
 MAX_PROJECT = 64 * 1024 * 1024
+
+
+class CheckpointStorageError(ValueError):
+    """Safe, actionable capacity errors that can be shown in project status."""
 
 
 def atomic_json(path, value):
@@ -66,13 +73,70 @@ def remembered_project(root=ROOT, recent=()):
 
 
 class Projects:
-    def __init__(self, ctx, root=ROOT, snapshot=None, export=None):
+    def __init__(self, ctx, root=ROOT, snapshot=None, export=None, limits=None):
         self.ctx, self.root = ctx, root
         self.folder = root / 'checkpoints'
         self.folder.mkdir(parents=True, exist_ok=True)
         self.error = ''
         self.last = None
         self.snapshot_fn, self.export_fn = snapshot, export
+        if limits is None:
+            try:
+                limits = json.loads(Path('/etc/pi-butler/limits.json').read_text())
+            except FileNotFoundError:
+                limits = {}
+        self.storage_limit = limits.get('storage_megabytes', 4096) * 1048576
+        self.checkpoint_budget = min(512 * 1048576, self.storage_limit // 4)
+        self.retention_days = limits.get('retention_days', 7)
+        self.max_checkpoints = 10
+
+    def _folders(self):
+        rows = []
+        for folder in self.folder.iterdir():
+            if folder.is_symlink() or not folder.is_dir() or not re.fullmatch(r'[a-f0-9]{32}', folder.name):
+                continue
+            try:
+                meta = json.loads((folder / 'checkpoint.json').read_text())
+                created = datetime.fromisoformat(meta['created']).timestamp()
+                # Older releases stored a redundant full ZIP. Downloads now build it on demand.
+                (folder / 'checkpoint.zip').unlink(missing_ok=True)
+                rows.append((created, folder, storage_bytes(folder)))
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+        return sorted(rows, key=lambda row: row[0], reverse=True)
+
+    def prune(self, protected=()):
+        """Bound history globally, preserving the newest complete recovery point."""
+        rows = self._folders()
+        protected = set(protected)
+        if rows:
+            protected.add(rows[0][1].name)
+        used, kept = 0, 0
+        cutoff = time.time() - self.retention_days * 86400
+        # Account protected revisions first so optional history fits around them.
+        for _, folder, size in rows:
+            if folder.name in protected:
+                used += size
+                kept += 1
+        for created, folder, size in rows:
+            if folder.name in protected:
+                continue
+            if created < cutoff or kept >= self.max_checkpoints or used + size > self.checkpoint_budget:
+                shutil.rmtree(folder)
+            else:
+                used += size
+                kept += 1
+
+    def download(self, ident, kind, destination):
+        """Copy under the project lock so later pruning cannot break a download."""
+        folder, _ = self.find(ident)
+        if kind == 'zip':
+            with zipfile.ZipFile(destination, 'w', compression=zipfile.ZIP_STORED) as archive:
+                for name in ('project.xknx', 'project.knxproj', 'checkpoint.json'):
+                    archive.write(folder / name, name)
+        else:
+            name = 'checkpoint.json' if kind == 'json' else 'project.' + kind
+            shutil.copyfile(folder / name, destination)
 
     @property
     def project(self):
@@ -150,7 +214,7 @@ class Projects:
             raise ValueError('Export is incomplete: missing manufacturer references')
         return ['Exchange export is unsigned; ETS acceptance has not been verified.']
 
-    def checkpoint(self, comment='', source='admin', actor='', force=True):
+    def checkpoint(self, comment='', source='admin', actor='', force=True, protected=()):
         if self.snapshot_fn is None and self.project.is_open and not self.project.loading:
             # Pinned upstream keeps newly added products and calculated values
             # pending in memory. Finish them as its normal close path does.
@@ -159,6 +223,7 @@ class Projects:
         active = self.active()
         if not active:
             raise ValueError('Open a project first')
+        self.prune(protected)
         rows = self.entries()
         if not force and rows and rows[0]['state'] == active['state']:
             self.last = rows[0]
@@ -167,26 +232,34 @@ class Projects:
         ident = uuid.uuid4().hex
         temporary = Path(tempfile.mkdtemp(prefix='.pending-', dir=self.folder))
         try:
+            # Allow for two maximum-size project artifacts plus manifest/staging overhead.
+            reserve = 2 * MAX_PROJECT + 1048576
+            if shutil.disk_usage(self.root).free < reserve:
+                raise CheckpointStorageError('Not enough storage for a safe checkpoint. Free space or increase storage_megabytes.')
             self._snapshot(temporary / 'project.xknx')
             warnings = self._export(temporary / 'project.xknx', temporary / 'project.knxproj') or []
+            if any((temporary / name).stat().st_size > MAX_PROJECT for name in ('project.xknx', 'project.knxproj')):
+                raise CheckpointStorageError('Checkpoint artifacts must each be at most 64 MiB.')
             meta = {**active, 'id': ident, 'created': datetime.now(timezone.utc).isoformat(),
                     'comment': comment[:500], 'source': source, 'actor': actor[:80], 'warnings': warnings,
                     'sha256': {name: digest(temporary / name) for name in ('project.xknx', 'project.knxproj')}}
             # Internal file paths are neither exported nor used as restore destinations.
             meta.pop('path')
             atomic_json(temporary / 'checkpoint.json', meta)
-            with zipfile.ZipFile(temporary / 'checkpoint.zip', 'w', compression=zipfile.ZIP_STORED) as archive:
-                for name in ('project.xknx', 'project.knxproj', 'checkpoint.json'):
-                    archive.write(temporary / name, name)
+            if storage_bytes(temporary) > self.checkpoint_budget:
+                raise CheckpointStorageError('Checkpoint exceeds its storage budget. Increase storage_megabytes or reduce the project size.')
             for artifact in temporary.iterdir():
                 with artifact.open('rb') as stream:
                     os.fsync(stream.fileno())
             os.replace(temporary, self.folder / ident)
             self.last, self.error = meta, ''
             self.remember()
+            self.prune(protected)
             return meta
-        except Exception:
+        except Exception as exc:
             self.error = 'Checkpoint/export failed. Changes remain in the live project; retry after inspecting the editor.'
+            if isinstance(exc, CheckpointStorageError):
+                self.error += ' ' + str(exc)
             raise
         finally:
             if temporary.exists():
@@ -197,6 +270,9 @@ class Projects:
         rows = self.entries()
         latest = rows[0] if rows else None
         return {'active': active, 'checkpoints': rows, 'error': self.error,
+                'storage': {'bytes': sum(row[2] for row in self._folders()),
+                            'budget_bytes': self.checkpoint_budget, 'max_checkpoints': self.max_checkpoints,
+                            'retention_days': self.retention_days},
                 'dirty': bool(active and (not latest or latest['state'] != active['state']))}
 
     def restore(self, ident, expected, actor=''):
@@ -207,7 +283,7 @@ class Projects:
         # Validate credentials and integrity BEFORE replacing or checkpointing anything.
         from xknxeditor.proj.core.project_secrets import check_project_password
         check_project_password(folder / 'project.xknx', self.project.project_password)
-        self.checkpoint('Before restore ' + ident, 'restore', actor)
+        self.checkpoint('Before restore ' + ident, 'restore', actor, protected=(ident,))
         self.project.replace_with(folder / 'project.xknx', self.project.project_password)
         try:
             return self.checkpoint('Restored ' + ident, 'restore', actor)

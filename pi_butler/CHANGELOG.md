@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+
+- Release the optional KNX Editor integration with admin-only ingress, isolated runtime, gateway firewall protection and automatically configured assistant tools.
+- Import repository projects into private working copies, reopen saved native projects, create paired native/exchange checkpoints and restore or deliver selected revisions through the configured Git workflow.
+- Provide seven finite offline assistant writes with default-deny project/device grants; parameter changes also require delete permission. Assistant bus writes and programming remain outside the finite tool surface.
+- Serialize checkpoint delivery from preparation through push so concurrent requests cannot publish another checkpoint's contents.
+- Keep the latest ten local checkpoints across projects, subject to age and storage limits. Generate ZIP downloads on demand and preserve recovery data when a checkpoint cannot be created.
+- Preserve unsaved permission drafts during project operations and notes typed during reloads. Validate renamed staged files before Git delivery.
+- Add regression coverage for concurrent delivery, bounded history, browser drafts and renamed-file validation. Physical KNX devices, ETS interoperability and final live HA acceptance still require target testing.
+
 ## 1.1.0-beta.2
 
 - Add the administrator-only KNX projects & access page: import the configured repository project as a separate working copy, retain manual imports, and reopen the last native project after restart.

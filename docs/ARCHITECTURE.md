@@ -36,7 +36,7 @@ capability sets; children have none. Missing capability/kernel support or policy
 failure prevents agent startup. Known gateway addresses remain protected even
 when the editor is disabled. All gateway/alternate IPs must be configured; unlisted
 custom-port interfaces, external relays and authorized HA actions remain separate
-paths. Tests and limitations are in the KNX implementation document.
+paths. Tests and live acceptance requirements are in [TESTING.md](TESTING.md#knx-acceptance-candidate).
 
 The Pi-owned MCP adapter exposes finite tools over a group-protected Unix socket.
 It cannot forward arbitrary API requests or save permissions. Ingress reaches

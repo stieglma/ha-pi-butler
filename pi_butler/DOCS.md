@@ -482,7 +482,7 @@ outcomes, and correlates relevant entity history and available Core logs. It is
 read-only and reports missing or expired evidence rather than assuming success or
 failure. Configuration changes remain a separately requested task.
 
-## Optional KNX Editor (1.1.0-beta.2)
+## Optional KNX Editor (1.2.0)
 
 Configure every gateway IP in `knx.gateway_addresses`, enable `knx.enabled` and
 restart. Verified HA administrators see **KNX Editor** and **KNX projects & access**
@@ -509,6 +509,13 @@ Password-protected exchange archives can still be imported through the editor UI
   available. Canvas UI changes are recorded as `editor`; no individual identity
   is guessed for those changes. Incomplete exports are not published as checkpoints,
   and their failure is shown in project status. The live working copy remains saved.
+  History is bounded globally across projects to 10 revisions, `retention_days`,
+  and the smaller of 512 MiB or one quarter of `storage_megabytes`. The newest
+  complete recovery point is kept even when it ages out. Older history is removed
+  automatically; download or deliver revisions needed permanently. Working projects
+  are not pruned. ZIP bundles are built on demand; redundant ZIPs from older releases
+  are removed. Checkpoint creation checks available capacity and preserves the
+  previous recovery point if a new export is too large or storage is insufficient.
 - Restore of a checkpoint belonging to the active project, guarded against stale
   project state and checksum failures. Current state is checkpointed before restore;
   the restored state creates a new revision. This does not revert bus devices.
