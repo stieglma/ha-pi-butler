@@ -69,6 +69,37 @@ docker exec "$container_name" /opt/venv/bin/python3 -c 'import json; from pathli
 docker exec "$container_name" setpriv --reuid 0 --regid 0 --groups 0 \
   --no-new-privs --bounding-set=-all,+dac_override --inh-caps=-all --ambient-caps=-all \
   /opt/venv/bin/python3 -c 'from pathlib import Path; from butler.maintenance import storage_bytes; assert storage_bytes("/data/service") >= Path("/data/service/options.json").stat().st_size > 0'
+# The real worker must count private service data before granting KNX headroom.
+docker exec -i "$container_name" /opt/venv/bin/python3 - <<'PY'
+import json, os, subprocess
+from pathlib import Path
+from butler.maintenance import storage_bytes
+reserve = 129 * 1048576
+limit = json.loads(Path('/etc/pi-butler/limits.json').read_text())['storage_megabytes'] * 1048576
+probe = Path('/data/service/capacity-probe')
+client = '''
+import os, sys
+from butler.maintenance import reserve_storage, StorageCapacityError
+assert not os.access('/data/service', os.R_OK)
+try:
+    with reserve_storage(129 * 1048576):
+        assert sys.argv[1] == 'allow'
+except StorageCapacityError as error:
+    assert sys.argv[1] == 'deny' and 'app-wide storage headroom' in str(error), str(error)
+'''
+command = ['setpriv', '--reuid', '1003', '--regid', '1003', '--clear-groups',
+           '--no-new-privs', '--bounding-set=-all', '--inh-caps=-all', '--ambient-caps=-all',
+           '/opt/venv/bin/python3', '-c', client]
+try:
+    size = limit - storage_bytes('/data') - reserve // 2
+    assert size > 0
+    with probe.open('wb') as stream:
+        stream.truncate(size)
+    subprocess.run(command + ['deny'], check=True)
+finally:
+    probe.unlink(missing_ok=True)
+subprocess.run(command + ['allow'], check=True)
+PY
 docker exec "$container_name" curl -fsS http://127.0.0.1:8504/ -o /dev/null
 # Registration must use the real pinned Pi Web API even without provider/Git login.
 for attempt in $(seq 1 45); do

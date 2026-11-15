@@ -200,6 +200,7 @@ def prepare():
             os.chmod(saved, 0o600)
     directory('/etc/pi-butler', 0, 0, 0o755)
     directory('/run/butler', 0, 0, 0o755)
+    directory('/run/butler/storage', 0, KNX, 0o2750)
     directory('/run/butler/access', ACCESS, SHARED, 0o750)
     directory('/run/butler/pi', PI, PI, 0o700)
     directory('/run/butler/workspace', PI, INGRESS, 0o2750)

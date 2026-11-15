@@ -15,13 +15,13 @@ from datetime import datetime, timezone
 import uuid
 import zipfile
 
-from .maintenance import storage_bytes
+from .maintenance import StorageCapacityError, reserve_storage, storage_bytes
 
 ROOT = Path('/data/knx')
 MAX_PROJECT = 64 * 1024 * 1024
 
 
-class CheckpointStorageError(ValueError):
+class CheckpointStorageError(StorageCapacityError):
     """Safe, actionable capacity errors that can be shown in project status."""
 
 
@@ -73,13 +73,14 @@ def remembered_project(root=ROOT, recent=()):
 
 
 class Projects:
-    def __init__(self, ctx, root=ROOT, snapshot=None, export=None, limits=None):
+    def __init__(self, ctx, root=ROOT, snapshot=None, export=None, limits=None, storage_reserver=None):
         self.ctx, self.root = ctx, root
         self.folder = root / 'checkpoints'
         self.folder.mkdir(parents=True, exist_ok=True)
         self.error = ''
         self.last = None
         self.snapshot_fn, self.export_fn = snapshot, export
+        self.storage_reserver = storage_reserver or reserve_storage
         if limits is None:
             try:
                 limits = json.loads(Path('/etc/pi-butler/limits.json').read_text())
@@ -245,29 +246,30 @@ class Projects:
             reserve = 2 * MAX_PROJECT + 1048576
             if shutil.disk_usage(self.root).free < reserve:
                 raise CheckpointStorageError('Not enough storage for a safe checkpoint. Free space or increase storage_megabytes.')
-            self._snapshot(temporary / 'project.xknx')
-            warnings = self._export(temporary / 'project.xknx', temporary / 'project.knxproj') or []
-            if any((temporary / name).stat().st_size > MAX_PROJECT for name in ('project.xknx', 'project.knxproj')):
-                raise CheckpointStorageError('Checkpoint artifacts must each be at most 64 MiB.')
-            meta = {**active, 'id': ident, 'created': datetime.now(timezone.utc).isoformat(),
-                    'comment': comment[:500], 'source': source, 'actor': actor[:80], 'warnings': warnings,
-                    'sha256': {name: digest(temporary / name) for name in ('project.xknx', 'project.knxproj')}}
-            # Internal file paths are neither exported nor used as restore destinations.
-            meta.pop('path')
-            atomic_json(temporary / 'checkpoint.json', meta)
-            if storage_bytes(temporary) > self.checkpoint_budget:
-                raise CheckpointStorageError('Checkpoint exceeds its storage budget. Increase storage_megabytes or reduce the project size.')
-            for artifact in temporary.iterdir():
-                with artifact.open('rb') as stream:
-                    os.fsync(stream.fileno())
-            os.replace(temporary, self.folder / ident)
-            self.last, self.error = meta, ''
-            self.remember()
-            self.prune(protected)
-            return meta
+            with self.storage_reserver(reserve):
+                self._snapshot(temporary / 'project.xknx')
+                warnings = self._export(temporary / 'project.xknx', temporary / 'project.knxproj') or []
+                if any((temporary / name).stat().st_size > MAX_PROJECT for name in ('project.xknx', 'project.knxproj')):
+                    raise CheckpointStorageError('Checkpoint artifacts must each be at most 64 MiB.')
+                meta = {**active, 'id': ident, 'created': datetime.now(timezone.utc).isoformat(),
+                        'comment': comment[:500], 'source': source, 'actor': actor[:80], 'warnings': warnings,
+                        'sha256': {name: digest(temporary / name) for name in ('project.xknx', 'project.knxproj')}}
+                # Internal file paths are neither exported nor used as restore destinations.
+                meta.pop('path')
+                atomic_json(temporary / 'checkpoint.json', meta)
+                if storage_bytes(temporary) > self.checkpoint_budget:
+                    raise CheckpointStorageError('Checkpoint exceeds its storage budget. Increase storage_megabytes or reduce the project size.')
+                for artifact in temporary.iterdir():
+                    with artifact.open('rb') as stream:
+                        os.fsync(stream.fileno())
+                os.replace(temporary, self.folder / ident)
+                self.last, self.error = meta, ''
+                self.remember()
+                self.prune(protected)
+                return meta
         except Exception as exc:
             self.error = 'Checkpoint/export failed. Changes remain in the live project; retry after inspecting the editor.'
-            if isinstance(exc, CheckpointStorageError):
+            if isinstance(exc, StorageCapacityError):
                 self.error += ' ' + str(exc)
             raise
         finally:

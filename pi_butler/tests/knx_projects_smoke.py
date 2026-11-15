@@ -1,5 +1,6 @@
 """Real pinned editor services: synthetic project only, no GUI or bus."""
 import json
+from functools import partial
 import shutil
 from pathlib import Path
 import sys
@@ -12,6 +13,7 @@ from butler.knx_runtime import Runtime
 from butler.knx_projects import remembered_project
 from butler.knx_repository import unpack_checkpoint
 from butler.policy import Rejected
+from butler.maintenance import reserve_storage, storage_server
 
 
 def main():
@@ -33,8 +35,10 @@ def main():
             run_on_ui=lambda fn, **kw: fn(), connection_plugin=Mock(), monitor=Mock(),
             keyring=Mock(), log=Logger(log, 'mcp'))
         runtime = Runtime(root)
-        with patch.object(settings, 'config_dir', lambda: root / 'config'):
+        with patch.object(settings, 'config_dir', lambda: root / 'config'), \
+                storage_server(root, 4096 * 1048576, root / 'capacity.sock'):
             runtime.attach(ctx, monitor=False)
+            runtime.projects.storage_reserver = partial(reserve_storage, path=root / 'capacity.sock')
             project.new(root / 'projects/manual.xknx', name='Synthetic House')
             # Public upstream synthetic product fixture, never the user's project.
             import editor_gui

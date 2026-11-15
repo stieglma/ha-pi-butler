@@ -13,7 +13,7 @@ for path in ['/data/knx/credentials.json', '/data/knx/projects', '/run/butler/kn
     else:
         os.close(fd)
         raise AssertionError('Protected path is readable: ' + path)
-for path in ['/data', '/etc/pi-butler/knx.json', '/run/butler/knx', '/opt/knx', '/etc/passwd', '/etc/pi-butler/workspace.json', '/opt/butler/butler/access.py', '/opt/butler-marketplace', '/usr/local/bin/butler-mcp', '/run/butler/access']:
+for path in ['/data', '/etc/pi-butler/knx.json', '/run/butler/knx', '/run/butler/storage', '/opt/knx', '/etc/passwd', '/etc/pi-butler/workspace.json', '/opt/butler/butler/access.py', '/opt/butler-marketplace', '/usr/local/bin/butler-mcp', '/run/butler/access']:
     assert not os.access(path, os.W_OK), 'Trusted path writable: ' + path
 for proc in Path('/proc').iterdir():
     if proc.name.isdigit():
@@ -42,4 +42,11 @@ with socket.socket(socket.AF_UNIX) as connection:
         pass
     else:
         raise AssertionError('Agent can reach permission management socket')
+with socket.socket(socket.AF_UNIX) as connection:
+    try:
+        connection.connect('/run/butler/storage/capacity.sock')
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError('Agent can reserve KNX checkpoint capacity')
 print('Boundary probe passed: file/process credential access denied, trusted paths protected, capabilities absent, approved socket reachable.')

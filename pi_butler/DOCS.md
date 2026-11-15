@@ -516,6 +516,10 @@ Password-protected exchange archives can still be imported through the editor UI
   are not pruned. ZIP bundles are built on demand; redundant ZIPs from older releases
   are removed. Checkpoint creation checks available capacity and preserves the
   previous recovery point if a new export is too large or storage is insufficient.
+  Before writing, the root storage worker checks current usage across all private
+  `/data` directories and reserves room for both maximum-size temporary artifacts
+  plus metadata. Insufficient app-wide headroom or unavailable accounting blocks
+  checkpoint creation; the editor does not gain access to other services' files.
 - Restore of a checkpoint belonging to the active project, guarded against stale
   project state and checksum failures. Current state is checkpointed before restore;
   the restored state creates a new revision. This does not revert bus devices.

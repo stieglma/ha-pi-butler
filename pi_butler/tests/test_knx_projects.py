@@ -1,5 +1,6 @@
 import io
 import hashlib
+from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
@@ -15,6 +16,7 @@ from butler.knx import authorize, normalize_policy, validate
 from butler.knx_projects import Projects, digest, remembered_project
 from butler.knx_repository import read_source, unpack_checkpoint, deliver_checkpoint
 from butler.policy import Rejected
+from butler.maintenance import StorageCapacityError, reserve_storage, storage_bytes, storage_server
 import test_workspace
 
 
@@ -29,10 +31,15 @@ class ProjectTests(unittest.TestCase):
             ensure_guid=lambda: 'project-guid', state_key=lambda: 'state-one',
             get_project_metadata=lambda: SimpleNamespace(name='House'))
         self.ctx = SimpleNamespace(api=SimpleNamespace(project=self.project))
+        self.capacity_path = self.root / 'capacity.sock'
+        self.capacity_service = storage_server(self.root, 4096 * 1048576, self.capacity_path)
+        self.capacity = self.capacity_service.__enter__()
         self.projects = Projects(self.ctx, self.root, snapshot=shutil.copyfile,
-            export=lambda src,dst: (dst.write_bytes(src.read_bytes()), [])[1])
+            export=lambda src,dst: (dst.write_bytes(src.read_bytes()), [])[1],
+            storage_reserver=partial(reserve_storage, path=self.capacity_path))
 
     def tearDown(self):
+        self.capacity_service.__exit__(None, None, None)
         self.tmp.cleanup()
 
     def test_complete_checkpoint_bundle_and_state_tracking(self):
@@ -192,6 +199,38 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(self.projects.entries()[0]['id'], first['id'])
         self.assertFalse(any(p.name.startswith('.pending-') for p in self.projects.folder.iterdir()))
 
+    def test_app_wide_capacity_includes_temporary_headroom_and_preserves_recovery(self):
+        first = self.projects.checkpoint()
+        self.capacity.limit = self.projects.storage_limit = 256 * 1048576
+        self.projects.checkpoint_budget = self.projects.storage_limit // 4
+        private = self.root / 'other-service'
+        private.mkdir(mode=0o700)
+        large = private / 'saved-data'
+        with large.open('wb') as stream:
+            stream.truncate(192 * 1048576)
+        self.project.state_key = lambda: 'next-state'
+        with patch('butler.knx_projects.shutil.disk_usage', return_value=SimpleNamespace(free=1 << 40)), \
+                patch.object(self.projects, '_snapshot') as snapshot:
+            with self.assertRaisesRegex(StorageCapacityError, 'app-wide storage headroom'):
+                self.projects.checkpoint()
+            snapshot.assert_not_called()
+        self.projects.find(first['id'])
+        self.assertIn('increase storage_megabytes', self.projects.error)
+        self.assertLess(storage_bytes(self.root), self.projects.storage_limit)
+        self.assertEqual(self.capacity.reserved, 0)
+        self.assertFalse(any(p.name.startswith('.pending-') for p in self.projects.folder.iterdir()))
+        large.unlink()
+        self.projects.find(self.projects.checkpoint()['id'])
+        self.assertEqual(self.capacity.reserved, 0)
+
+    def test_unavailable_storage_worker_blocks_new_checkpoint_without_losing_recovery(self):
+        first = self.projects.checkpoint()
+        self.project.state_key = lambda: 'next-state'
+        self.projects.storage_reserver = partial(reserve_storage, path=self.root / 'missing.sock')
+        with self.assertRaisesRegex(StorageCapacityError, 'Storage accounting unavailable'):
+            self.projects.checkpoint()
+        self.projects.find(first['id'])
+
     def test_legacy_duplicate_zip_is_removed(self):
         first = self.projects.checkpoint()
         legacy = self.projects.folder / first['id'] / 'checkpoint.zip'
@@ -329,8 +368,10 @@ class KnxDeliveryTests(unittest.TestCase):
         project = SimpleNamespace(is_open=True, loading=False, path=native, working_path=native,
             ensure_guid=lambda:'guid',state_key=lambda:'state',get_project_metadata=lambda:SimpleNamespace(name='House'))
         projects=Projects(SimpleNamespace(api=SimpleNamespace(project=project)), private,
-            snapshot=shutil.copyfile,export=lambda src,dst:(dst.write_bytes(b'\xffPK export'),[])[1])
-        checkpoint=projects.checkpoint('Delivery')
+            snapshot=shutil.copyfile,export=lambda src,dst:(dst.write_bytes(b'\xffPK export'),[])[1],
+            storage_reserver=partial(reserve_storage, path=private/'capacity.sock'))
+        with storage_server(self.root, 4096 * 1048576, private/'capacity.sock'):
+            checkpoint=projects.checkpoint('Delivery')
         download=private/'download.zip'
         projects.download(checkpoint['id'], 'zip', download)
         raw=download.read_bytes()

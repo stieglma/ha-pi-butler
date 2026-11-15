@@ -26,6 +26,12 @@ runs as uid 1002. The optional KNX editor and finite read gateway run as uid 100
 Agent-facing processes have no capabilities and cannot modify protected service
 code, options or policy storage. A separate storage-accounting worker retains
 only DAC override capability to count private files; artifact retention runs as Pi.
+That worker also grants KNX checkpoint capacity reservations over a root-owned
+Unix socket accessible only to the KNX group. It counts current app-wide usage
+and outstanding reservations; the editor holds its reservation through snapshot,
+export and publication. No file contents or paths cross this interface. Ordinary
+workspace writes remain subject to the periodic storage safeguard, not a hard
+filesystem quota.
 
 Before launching any agent/profile process, root atomically installs a dual-stack
 nftables egress policy in the container's private network namespace. Configured KNX
