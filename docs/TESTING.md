@@ -12,7 +12,7 @@ Run from the repository root with Python 3.11 or later, Node and uv available:
 ```sh
 uv sync --project pi_butler --locked
 PYTHONPATH=pi_butler/src uv run --project pi_butler --locked python -m unittest discover -s pi_butler/tests -v
-node --test pi_butler/tests/test_browser_policy.mjs pi_butler/tests/test_starters.mjs
+node --test pi_butler/tests/test_browser_policy.mjs pi_butler/tests/test_starters.mjs pi_butler/tests/test_settings.mjs
 uv run --project pi_butler --locked python pi_butler/tests/check_metadata.py
 uv run --project pi_butler --locked python -m compileall -q pi_butler/src
 git diff --check
@@ -23,6 +23,42 @@ saves, bounded/redacted upstream reads, MCP framing, ingress routing and method
 boundaries, Git preparation/delivery failure paths, setup/house notes and workflow
 launch contracts. Fake HA/forge responses and temporary bare repositories do not
 prove behavior with live services.
+
+## KNX 1.2.0 lifecycle checks
+
+Local release checks passed 125 Python tests and 20 Node tests, metadata validation
+and Python compilation. These checks do not replace the native image and live
+acceptance checks below.
+
+The 125 Python tests also passed in the existing amd64 runtime image with the
+current source mounted. The pinned editor lifecycle smoke passed under emulation,
+including damaged-checkpoint rebuilding and restore while its real closing
+callback prunes the selected revision. This does not establish native firewall
+or live device behavior.
+
+The production-launcher smoke also verifies that uid 1003 cannot create a
+checkpoint when root-private service data leaves insufficient app-wide temporary
+headroom, while its prior checkpoint remains usable. Capacity regressions cover
+fresh accounting, outstanding reservations, release after failure, and unavailable
+accounting. The full container smoke checks the restricted root worker and socket
+access using the production identities.
+
+The image CI runs `knx_projects_smoke.py`, `knx_api_smoke.py` and
+`knx_runtime_smoke.py` using the separate pinned editor Python environment, in
+addition to its credential smoke. Run the runtime smoke only in a fresh disposable
+container: it creates synthetic files at `/data/knx` and launches the production
+headless editor twice as uid 1003 with `--no-connect`. It does not test the firewall
+or connect/program any bus device.
+
+Earlier beta.2 evidence: 112 Python unit/integration tests and 12 Node tests passed;
+the linux/amd64 image built under emulation and its 112 Python tests passed.
+Pinned editor synthetic tests cover paired export/reimport of a public fixture
+device, native reopen with an empty catalog, stale permission rejection,
+default-denied/granted writes, rollback, and a failed pre-programming checkpoint.
+The headless production launcher passed manual-project adoption, initial automatic
+checkpoint, denied mutation and reopening after process restart. Browser checks
+under an ingress prefix exercised permission save, checkpoint and restore, text
+escaping and a 390px layout. These are not live HA/ETS/house-device acceptance.
 
 ## Image and runtime checks
 
@@ -115,8 +151,8 @@ was deliberately skipped; optional download-cache mounts have not been implement
 
 ## KNX acceptance candidate
 
-The optional KNX integration has separate [implementation and HA acceptance
-steps](KNX-EDITOR-IMPLEMENTATION.md). Unit tests cover active-admin identity,
+The optional KNX integration is described in the [user documentation](../pi_butler/DOCS.md#optional-knx-editor-120).
+Unit tests cover active-admin identity,
 HTTP/WebSocket credentials, finite reads, source paths, gateway IP validation,
 and fail-closed firewall setup. `knx_mcp_smoke.py` checks pinned FastMCP JSON/SSE
 framing and authentication without a project or GUI. `knx_editor_auth_smoke.py`
@@ -169,3 +205,31 @@ source-location default migration, custom paths, exact selection without fallbac
 and rejection of traversal/symlink/nonregular sources. Setup reports presence and
 manual import only. `knx.gateway_addresses` must now contain all interface IPs
 before KNX can be enabled; the firewall never infers these from mutable repo files.
+
+### Live KNX acceptance
+
+Record the exact installed commit, Core and Supervisor versions. Use a project
+copy first and keep Protection mode enabled. Local synthetic checks do not prove
+manufacturer compatibility, ETS acceptance or behavior on physical devices.
+
+1. Configure every real gateway address, enable KNX and restart. Verify firewall
+   enforcement, the initially disconnected editor, ingress HTTP/WebSockets and
+   file upload/download. Check module disable/re-enable and retained working data.
+2. Verify admin and non-admin access, including direct editor and file URLs.
+   Missing identity or unavailable role lookup must deny access. Check that the
+   agent cannot use internal editor ports, credentials or arbitrary upstream tools.
+3. Import a project copy, compare devices, parameters, group addresses and object
+   links, then export/reimport and compare semantics. Verify protected-project
+   password behavior and representative manufacturer-specific functions separately.
+4. Exercise finite assistant reads and default-denied/scoped writes, including
+   parameter changes that require delete permission. Test concurrent UI/MCP edits,
+   checkpoint/export failure, restore, restart/reopening and cold HA backup/restore.
+   Confirm history retains at most the latest ten checkpoints after operations,
+   subject to age/byte limits, and that failed checkpoints preserve recovery data.
+5. Before Git delivery, add the configured editor-only folder to `restart_ignore`
+   in the separate HA Git app. Do not exclude folders containing HA entity YAMLs.
+   Verify the configured push/PR workflow, exact delivered artifacts, concurrent
+   deliveries and preservation of unrelated work after failures.
+6. Perform bus/programming tests as a separate controlled step. Verify that a
+   failed pre-programming checkpoint blocks programming. Record support for each
+   tested device/application version; project restore does not revert bus devices.

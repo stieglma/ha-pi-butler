@@ -65,6 +65,7 @@ if __name__ == '__main__':
         return read_text(path, *args, **kwargs)
     with patch.dict(os.environ, {'XKNX_MCP_AUTH_TOKEN': 'supervisor-private-token'}), \
          patch('butler.knx_editor.Path.read_text', read_credentials), \
-         patch('editor_gui.main.main', side_effect=exercise_editor):
+         patch('editor_gui.main.main', side_effect=exercise_editor), \
+         patch('butler.knx_runtime.Runtime.attach'):
         main()
     print('Pinned editor launcher: no UI token disclosure; restart authentication passed')

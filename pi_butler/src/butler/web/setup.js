@@ -1,10 +1,11 @@
 'use strict';
 const byId = (id) => document.getElementById(id);
-const labels = { model: 'Model configuration', ha: 'Home Assistant connection', scratch: 'Investigation project', repository: 'Repository setup', git: 'Git authentication', repository_project: 'Repository project', knx_project: 'KNX repository source (manual import)' };
+const labels = { model: 'Model configuration', ha: 'Home Assistant connection', scratch: 'Investigation project', repository: 'Repository setup', git: 'Git authentication', repository_project: 'Repository project', knx_project: 'KNX repository source' };
 const states = { ready: 'Ready', pending: 'Needs attention', not_configured: 'Optional', optional: 'Optional', unknown: 'Check manually' };
 let version;
 let savedText = '';
 let saving = false;
+let loadingMemory = false;
 async function api(path, options) {
   const response = await fetch(path, { cache: 'no-store', ...options });
   const value = await response.json();
@@ -35,8 +36,20 @@ async function refresh() {
 async function loadMemory() {
   if (byId('memory').value !== savedText && version && !window.confirm('Discard your unsaved note changes?')) return;
   byId('reload').disabled = true;
+  loadingMemory = true;
+  byId('save').disabled = true;
+  const requestedText = byId('memory').value;
   try {
     const result = await api('memory');
+    if (byId('memory').value !== requestedText) {
+      if (version === undefined) {
+        version = result.version;
+        savedText = result.text;
+        byId('memory').disabled = false;
+      }
+      byId('memory-status').textContent = 'New edits were preserved. Reload again to discard them.';
+      return;
+    }
     byId('memory').value = result.text;
     version = result.version;
     savedText = result.text;
@@ -44,10 +57,14 @@ async function loadMemory() {
     byId('memory-status').textContent = 'Notes loaded.';
     byId('save').disabled = true;
   } catch (error) { byId('memory-status').textContent = error.message; }
-  finally { byId('reload').disabled = false; }
+  finally {
+    loadingMemory = false;
+    byId('reload').disabled = false;
+    byId('save').disabled = saving || byId('memory').value === savedText;
+  }
 }
 byId('memory').addEventListener('input', () => {
-  byId('save').disabled = saving || byId('memory').value === savedText;
+  byId('save').disabled = saving || loadingMemory || byId('memory').value === savedText;
   byId('memory-status').textContent = 'Unsaved changes.';
 });
 byId('save').addEventListener('click', async () => {

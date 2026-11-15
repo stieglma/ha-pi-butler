@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import re
 from urllib.parse import quote
-from .onboarding import read_bounded
+from .onboarding import read_bounded, read_bounded_request
 from aiohttp import ClientSession, ClientTimeout, DummyCookieJar, UnixConnector, WSMsgType, web
 
 # HA's documented ingress peer. Forwarded headers are never authentication.
@@ -16,7 +16,7 @@ WORKSPACE_CLIENT = web.AppKey('workspace_client', ClientSession)
 WEB_ROOT = Path(__file__).parent / 'web'
 ASSET_TYPES = {'access.js': 'text/javascript', 'access-loader.js': 'text/javascript',
                'policy-model.mjs': 'text/javascript', 'access.css': 'text/css', 'navigation.css': 'text/css', 'navigation.js': 'text/javascript',
-               'setup.js': 'text/javascript', 'setup.css': 'text/css',
+               'knx-projects.js': 'text/javascript', 'knx-projects.css': 'text/css', 'setup.js': 'text/javascript', 'setup.css': 'text/css',
                'starters.js': 'text/javascript', 'starter-model.mjs': 'text/javascript', 'starters.css': 'text/css'}
 PAGE_HEADERS = {'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'", 'X-Content-Type-Options': 'nosniff'}
 HOP = {'connection', 'upgrade', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
@@ -52,6 +52,46 @@ async def proxy(request):
         # Host integration and login are not browser-facing interfaces.
         if path.removeprefix('/butler/knx/') in ('host', 'login'):
             raise web.HTTPNotFound()
+    if editor and path == '/butler/knx/projects/':
+        if request.method != 'GET':
+            raise web.HTTPMethodNotAllowed(request.method, ['GET'])
+        return web.FileResponse(WEB_ROOT / 'knx-projects.html', headers=PAGE_HEADERS)
+    if editor and (path.startswith('/butler/knx/butler-api/') or path == '/butler/knx/butler-assistant'):
+        action = path.removeprefix('/butler/knx/butler-api/')
+        if action not in ('status', 'policy', 'checkpoint', 'restore', 'import', 'download', 'deliver'):
+            raise web.HTTPNotFound()
+        expected = 'GET' if action in ('status', 'download') else 'POST'
+        if request.method != expected:
+            raise web.HTTPMethodNotAllowed(request.method, [expected])
+        if expected == 'POST' and (request.headers.get('X-Butler-Settings') != '1' or request.content_type != 'application/json'):
+            raise web.HTTPForbidden(text='Settings request required')
+        if action in ('import', 'deliver'):
+            try:
+                body = json.loads(await read_bounded_request(request, 32768))
+                client = request.app[CLIENT]
+                headers = {'X-Butler-KNX-Token': knx['web_token'],
+                           'X-Butler-Admin-Id': request.headers['X-Remote-User-Id']}
+                if action == 'import':
+                    if body != {}:
+                        raise ValueError('Import uses the configured repository source')
+                    async with request.app[WORKSPACE_CLIENT].get('http://localhost/knx-source') as source:
+                        if source.status != 200:
+                            raise ValueError('Repository source is unavailable. Check the configured project filename in Setup.')
+                        async with client.post('http://127.0.0.1:8511/butler-api/import',
+                                headers=headers, data=source.content.iter_chunked(65536), allow_redirects=False) as reply:
+                            return web.json_response(json.loads(await read_bounded(reply, 1048576)), status=reply.status)
+                if not isinstance(body, dict) or set(body) != {'id'} or not re.fullmatch(r'[a-f0-9]{32}', body.get('id', '')):
+                    raise ValueError('Select a checkpoint to deliver')
+                async with client.get('http://127.0.0.1:8511/butler-api/download?id=' + body['id'] + '&kind=zip', headers=headers) as source:
+                    if source.status != 200:
+                        raise ValueError('Checkpoint is unavailable')
+                    async with request.app[WORKSPACE_CLIENT].post('http://localhost/knx-deliver',
+                            data=source.content.iter_chunked(65536), timeout=ClientTimeout(total=650)) as reply:
+                        return web.json_response(json.loads(await read_bounded(reply, 1048576)), status=reply.status)
+            except (ValueError, OSError) as exc:
+                return web.json_response({'error': str(exc)}, status=400)
+            except Exception:
+                return web.json_response({'error': 'KNX repository exchange unavailable; inspect project and Git status before retrying.'}, status=502)
     if path == '/butler/starters/':
         if request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
@@ -132,8 +172,9 @@ async def proxy(request):
         # this hop independently of upstream's browser sessions.
         headers = {k: v for k, v in headers.items() if k.lower() not in
                    {'x-butler-knx-token', 'cookie', 'authorization', 'x-remote-user-id',
-                    'x-remote-user-name', 'x-remote-user-display-name'}}
+                    'x-remote-user-name', 'x-remote-user-display-name', 'x-butler-admin-id', 'x-butler-mcp-token'}}
         headers['X-Butler-KNX-Token'] = knx['web_token']
+        headers['X-Butler-Admin-Id'] = request.headers['X-Remote-User-Id']
         headers['X-Forwarded-Host'] = request.host
     if request.method == 'GET' and path == '/':
         headers = {k: v for k, v in headers.items() if k.lower() not in {'if-none-match', 'if-modified-since'}}
@@ -180,7 +221,7 @@ async def proxy(request):
             body = await upstream.read()
             navigation = b'<link rel="stylesheet" href="butler/assets/navigation.css"><nav id="butler-navigation" aria-label="Butler"><button id="butler-navigation-toggle" type="button" aria-label="Toggle Butler menu" aria-expanded="false" aria-controls="butler-navigation-links">+</button><div id="butler-navigation-links"><a id="butler-settings-link" href="butler/" target="_blank" rel="noopener">Manage HA AI Access</a><a href="butler/setup/" target="_blank" rel="noopener">Setup &amp; house notes</a><a id="butler-starters-link" href="butler/starters/" target="_blank" rel="noopener">Investigate your home</a></div></nav><script src="butler/assets/navigation.js" defer></script>'
             if knx['enabled'] and await knx_admin(request):
-                navigation = navigation.replace(b'</div></nav>', b'<a href="butler/knx/" target="_blank" rel="noopener">KNX Editor</a></div></nav>')
+                navigation = navigation.replace(b'</div></nav>', b'<a href="butler/knx/" target="_blank" rel="noopener">KNX Editor</a><a href="butler/knx/projects/" target="_blank" rel="noopener">KNX projects &amp; access</a></div></nav>')
             body = body.replace(b'</body>', navigation + b'</body>', 1)
             for key in list(response_headers):
                 if key.lower() in {'etag', 'last-modified'}:

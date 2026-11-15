@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
-from butler.maintenance import expire, storage_bytes
+from butler.maintenance import StorageCapacityError, expire, reserve_storage, storage_bytes, storage_server
 
 
 class RetentionTests(unittest.TestCase):
@@ -32,6 +32,34 @@ class RetentionTests(unittest.TestCase):
 
 
 class StorageTests(unittest.TestCase):
+    def test_reservations_account_for_live_usage_and_release_on_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data = root / 'data'
+            data.mkdir()
+            path = root / 'capacity.sock'
+            with storage_server(data, 100, path) as capacity:
+                self.assertEqual(path.stat().st_mode & 0o777, 0o660)
+                with reserve_storage(60, path):
+                    with self.assertRaises(StorageCapacityError):
+                        with reserve_storage(41, path):
+                            self.fail('Concurrent reservations exceeded the app limit')
+                    self.assertEqual(capacity.reserved, 60)
+                self.assertEqual(capacity.reserved, 0)
+                with self.assertRaisesRegex(RuntimeError, 'failed operation'):
+                    with reserve_storage(100, path):
+                        raise RuntimeError('failed operation')
+                self.assertEqual(capacity.reserved, 0)
+                private = data / 'private'
+                private.mkdir(mode=0o700)
+                (private / 'file').write_bytes(b'x' * 70)
+                with self.assertRaises(StorageCapacityError):
+                    with reserve_storage(31, path):
+                        self.fail('Private data was omitted from accounting')
+                with reserve_storage(30, path):
+                    pass
+            self.assertFalse(path.exists())
+
     def test_counts_nested_files_without_following_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

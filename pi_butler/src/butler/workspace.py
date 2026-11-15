@@ -8,12 +8,14 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import threading
 from urllib.parse import urlsplit
 import uuid
 
 ROOT = Path('/data/workspaces')
 CONFIG = Path('/etc/pi-butler/workspace.json')
 STATUS = Path('/data/status/repository.json')
+_LOCK_STATE = threading.local()
 
 
 class WorkspaceError(ValueError):
@@ -62,10 +64,22 @@ def validate_config(config):
 
 @contextlib.contextmanager
 def locked():
+    """Serialize workspace transactions, allowing nested helpers on this thread."""
     ROOT.mkdir(parents=True, exist_ok=True)
-    with (ROOT / '.butler.lock').open('a') as stream:
-        fcntl.flock(stream, fcntl.LOCK_EX)
+    path = (ROOT / '.butler.lock').resolve()
+    held = getattr(_LOCK_STATE, 'held', None)
+    if held is None:
+        held = _LOCK_STATE.held = set()
+    if path in held:
         yield
+        return
+    with path.open('a') as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        held.add(path)
+        try:
+            yield
+        finally:
+            held.remove(path)
 
 
 def status(state, help_text):
@@ -150,10 +164,12 @@ def worktree(config, name):
 def check_changes(cwd):
     run('git', 'diff', '--check', cwd=cwd)
     run('git', 'diff', '--cached', '--check', cwd=cwd)
-    changed = run('git', 'diff', '--cached', '--name-only', '--diff-filter=ACM', '-z', cwd=cwd).split('\0')
+    changed = run('git', 'diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z', cwd=cwd, strip=False).split('\0')
     import ast
     import yaml
     for name in filter(None, changed):
+        if not name.endswith(('.yaml', '.yml', '.json', '.py', '.sh')):
+            continue
         # Validate the exact staged candidate, even when working tree differs.
         text = run('git', 'show', ':' + name, cwd=cwd, strip=False)
         try:
@@ -194,7 +210,7 @@ def forge_delivery(config, cwd, current):
     return existing[0]['web_url']
 
 
-def deliver(config, cwd, message):
+def deliver(config, cwd, message, expected_blobs=None):
     cwd = Path(run('git', 'rev-parse', '--show-toplevel', cwd=cwd)).resolve()
     if not cwd.is_relative_to(ROOT.resolve()):
         raise WorkspaceError('Delivery must run inside an app workspace')
@@ -215,11 +231,23 @@ def deliver(config, cwd, message):
         run('git', 'fetch', 'origin', base, cwd=cwd)
         if config['delivery'] == 'push':
             run('git', 'merge-base', '--is-ancestor', f'refs/remotes/origin/{base}', 'HEAD', cwd=cwd)
+        baseline = run('git', 'rev-parse', 'HEAD', cwd=cwd)
+        if expected_blobs is not None:
+            for path, expected in expected_blobs.items():
+                if run('git', 'rev-parse', ':' + path, cwd=cwd) != expected:
+                    raise WorkspaceError('Staged checkpoint checksum mismatch; delivery stopped')
         check_changes(cwd)
         if run('git', 'diff', '--cached', '--name-only', cwd=cwd):
             if not message.strip():
                 raise WorkspaceError('Commit message required')
             run('git', 'commit', '-m', message, cwd=cwd)
+        if expected_blobs is not None:
+            changed = set(filter(None, run('git', 'diff', '--name-only', '-z', baseline, 'HEAD', cwd=cwd).split('\0')))
+            if changed - set(expected_blobs):
+                raise WorkspaceError('Unexpected committed checkpoint files; delivery stopped')
+            for path, expected in expected_blobs.items():
+                if run('git', 'rev-parse', 'HEAD:' + path, cwd=cwd) != expected:
+                    raise WorkspaceError('Committed checkpoint checksum mismatch; delivery stopped')
         run('git', 'push', 'origin', f'HEAD:refs/heads/{target}', cwd=cwd)
         commit = run('git', 'rev-parse', 'HEAD', cwd=cwd)
         if config['delivery'] == 'push':

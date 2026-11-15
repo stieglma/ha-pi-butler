@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 from aiohttp import ClientSession, ClientTimeout, web
-from .knx import validate
+from .knx import CAPABILITIES, validate
 from .policy import Rejected
 
 
@@ -65,20 +65,34 @@ def application(token, read_enabled, audit, call=call_editor):
                 raise Rejected('Invalid KNX request')
             name, args = body['tool'], body['arguments']
             validate(name, args)
-            if not read_enabled:
+            if not read_enabled and name not in CAPABILITIES:
                 raise Rejected('KNX assistant reads are disabled in app options')
-            async with semaphore, asyncio.timeout(25):
-                result = await call(name, args, token)
+            async with semaphore, asyncio.timeout(650):
+                if name in CAPABILITIES:
+                    async with ClientSession(timeout=ClientTimeout(total=650), trust_env=False) as client:
+                        async with client.post('http://127.0.0.1:8511/butler-assistant',
+                                headers={'X-Butler-MCP-Token': token}, json={'tool': name, 'arguments': args},
+                                allow_redirects=False) as reply:
+                            raw = bytearray()
+                            async for chunk in reply.content.iter_chunked(65536):
+                                raw.extend(chunk)
+                                if len(raw) > 2097152:
+                                    raise Rejected('KNX result too large')
+                            result = json.loads(raw)
+                            if reply.status != 200:
+                                raise Rejected(result.get('error', 'KNX mutation rejected'))
+                else:
+                    result = await call(name, args, token)
                 if len(json.dumps(result).encode()) > 2097152:
                     raise Rejected('KNX result too large; narrow the query')
-            audit.info(json.dumps({'tool': name, 'decision': 'read'}))
+            audit.info(json.dumps({'tool': name, 'decision': 'write' if name in CAPABILITIES else 'read'}))
             return web.json_response({'result': result})
         except Rejected as exc:
             audit.info(json.dumps({'tool': name if isinstance(name, str) and len(name) < 80 else None, 'decision': 'denied'}))
             return web.json_response({'error': str(exc)}, status=400)
         except Exception:
             audit.info('KNX read failed')
-            return web.json_response({'error': 'KNX editor unavailable or read failed; open a project in the admin UI.'}, status=502)
+            return web.json_response({'error': 'KNX editor unavailable or operation failed; inspect the active project in the admin UI before retrying.'}, status=502)
     app = web.Application(client_max_size=32768)
     app.router.add_post('/call', read)
     return app

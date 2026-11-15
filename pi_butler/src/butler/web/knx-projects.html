@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pi Butler · KNX projects &amp; access</title>
+<link rel="stylesheet" href="../../assets/setup.css"><link rel="stylesheet" href="../../assets/knx-projects.css"><script defer src="../../assets/knx-projects.js"></script></head>
+<body><header><a href="../../../">Pi Butler</a><nav><a href="../">KNX Editor →</a><a href="../../setup/">Setup</a></nav></header>
+<main><h1>KNX projects &amp; access</h1><p id="message" role="status">Loading…</p><button id="refresh">Refresh</button>
+<section><h2>Active project</h2><p id="active"></p><p id="saved"></p>
+<p>The last saved native project reopens after restart. Protected projects may ask for their password again.</p>
+<button id="import">Import configured repository project as a new working copy</button>
+<p>Your current project and previous imports are retained. Import uses the configured repository folder and filename. Password-protected exchange archives can be imported through the editor.</p>
+<label for="comment">Checkpoint description</label><input id="comment" maxlength="500" placeholder="Describe this revision"><button id="checkpoint">Create checkpoint</button>
+<p>Each complete checkpoint contains a native project and a matching exchange export. Automatic checkpoints group editor changes about every 30 seconds. Export failures leave changes marked unsaved.</p></section>
+<section><h2>Checkpoints</h2><p>Restore saves the current state first and creates a new revision. Restoring a project does not revert programmed devices.</p>
+<p id="checkpoint-storage"></p><p>History is bounded across all projects. Older checkpoints are removed automatically; download or deliver revisions you want to keep permanently. Working projects are retained.</p>
+<p>Git delivery follows your configured push or pull request workflow. A push may deploy through your separate HA Git app; configure its restart exclusions for this editor folder first.</p><div id="history"></div></section>
+<section><h2>Assistant project permissions</h2><p>Project reads follow the app's read setting. Writes default to denied. Grants apply to this project's GUID; an empty device selection grants the capability across the project, including group addresses.</p>
+<p>Parameter changes may remove links and require both change and delete permission. Device-scoped grants cannot change or delete project-wide group addresses. Bus writes and programming remain available in the privileged editor UI.</p>
+<p id="policy-status" role="status"></p><div id="grants"></div><button id="add-grant">Add grant for active project</button><button id="save-policy">Save permissions</button><button id="reload-policy">Reload permissions</button></section>
+</main></body></html>

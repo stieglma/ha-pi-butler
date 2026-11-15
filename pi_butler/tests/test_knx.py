@@ -7,7 +7,7 @@ from aiohttp import DummyCookieJar, web
 from aiohttp.test_utils import TestClient, TestServer
 from butler.access import applications
 from butler.ingress import proxy, CLIENT, CATALOG_CLIENT, KNX_CONFIG
-from butler.knx import TOOLS, validate
+from butler.knx import TOOLS, READ_TOOLS, WRITES, validate
 from butler.knx_bridge import application, call_editor
 from butler.knx_editor import protected_app
 from butler.mcp import dispatch
@@ -40,7 +40,8 @@ class KnxTests(unittest.IsolatedAsyncioTestCase):
                 validate(name, args)
         result = await dispatch({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'}, None, TOOLS)
         self.assertEqual(result['result']['tools'], TOOLS)
-        self.assertEqual(len(TOOLS), 6)
+        self.assertEqual(len(READ_TOOLS), 6)
+        self.assertEqual(len(TOOLS), len(READ_TOOLS) + len(WRITES))
 
     async def test_gateway_policy_and_errors_never_leak_token(self):
         call = AsyncMock(return_value={'count': 40})
@@ -106,9 +107,12 @@ class KnxTests(unittest.IsolatedAsyncioTestCase):
             app.router.add_route('*', '/{path:.*}', proxy)
             async with TestClient(TestServer(app)) as client:
                 with patch('butler.ingress.INGRESS_PEER', '127.0.0.1'):
-                    for route in ('/', '/ws', '/upload', '/files/123/project.xknx'):
+                    for route in ('/', '/ws', '/upload', '/files/123/project.xknx', '/projects/', '/butler-api/status', '/butler-api/policy', '/butler-assistant'):
                         self.assertEqual((await client.get('/butler/knx' + route)).status, 403)
                     headers = {'X-Remote-User-Id': 'a' * 32, 'X-Butler-KNX-Token': 'forged', 'Cookie': 'x=y'}
+                    self.assertEqual((await client.post('/butler/knx/butler-api/policy', headers=headers, json={})).status, 403)
+                    self.assertEqual((await client.post('/butler/knx/butler-assistant', headers=headers, json={})).status, 404)
+                    self.assertEqual((await client.get('/butler/knx/projects/', headers=headers)).status, 200)
                     reply = await client.get('/butler/knx/client.js?q=1', headers=headers)
                     self.assertEqual(reply.status, 200)
                     self.assertNotIn('Set-Cookie', reply.headers)
@@ -119,3 +123,49 @@ class KnxTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual((await client.get('/butler/knx/host', headers=headers)).status, 404)
                     config['enabled'] = False
                     self.assertEqual((await client.get('/butler/knx/', headers=headers)).status, 404)
+
+    async def test_admin_repository_exchange_streams_without_exposing_paths_or_credentials(self):
+        from butler.ingress import WORKSPACE_CLIENT
+        received = []
+        async def editor(request):
+            received.append(('editor', request.path, await request.read(),
+                             request.headers.get('X-Butler-KNX-Token'), request.headers.get('X-Butler-Admin-Id')))
+            return web.Response(body=b'checkpoint bundle') if request.method == 'GET' else web.json_response({'imported':'new.xknx'})
+        async def repository(request):
+            if request.method == 'GET':
+                return web.Response(body=b'repository project bytes')
+            received.append(('delivery', await request.read()))
+            return web.json_response({'commit':'test-commit','branch':'configured'})
+        backapp, repoapp = web.Application(), web.Application()
+        backapp.router.add_route('*','/{path:.*}',editor)
+        repoapp.router.add_route('*','/{path:.*}',repository)
+        async with TestClient(TestServer(backapp)) as back, TestClient(TestServer(repoapp)) as repo:
+            class EditorClient:
+                def post(self,url,**kwargs):
+                    return back.post(url.removeprefix('http://127.0.0.1:8511'),**kwargs)
+                def get(self,url,**kwargs):
+                    return back.get(url.removeprefix('http://127.0.0.1:8511'),**kwargs)
+            class RepoClient:
+                def get(self,url,**kwargs):
+                    return repo.get(url.removeprefix('http://localhost'),**kwargs)
+                def post(self,url,**kwargs):
+                    return repo.post(url.removeprefix('http://localhost'),**kwargs)
+            identity = Mock()
+            identity.get.return_value.__aenter__ = AsyncMock(return_value=Mock(status=200,json=AsyncMock(return_value={'admin':True})))
+            identity.get.return_value.__aexit__ = AsyncMock(return_value=False)
+            app=web.Application()
+            app[CLIENT],app[WORKSPACE_CLIENT],app[CATALOG_CLIENT]=EditorClient(),RepoClient(),identity
+            app[KNX_CONFIG]={'enabled':True,'web_token':'private-web-token'}
+            app.router.add_route('*','/{path:.*}',proxy)
+            async with TestClient(TestServer(app)) as client:
+                with patch('butler.ingress.INGRESS_PEER','127.0.0.1'):
+                    headers={'X-Remote-User-Id':'a'*32,'X-Butler-Settings':'1','X-Butler-Admin-Id':'forged'}
+                    response=await client.post('/butler/knx/butler-api/import',headers=headers,json={})
+                    self.assertEqual(response.status,200)
+                    self.assertEqual(received[0],('editor','/butler-api/import',b'repository project bytes','private-web-token','a'*32))
+                    self.assertNotIn('private-web-token',await response.text())
+                    self.assertEqual((await client.post('/butler/knx/butler-api/import',headers=headers,json={'path':'/data/pi/evil'})).status,400)
+                    response=await client.post('/butler/knx/butler-api/deliver',headers=headers,json={'id':'b'*32})
+                    self.assertEqual(response.status,200)
+                    self.assertEqual(received[-1],('delivery',b'checkpoint bundle'))
+                    self.assertEqual((await client.post('/butler/knx/butler-api/deliver',headers=headers,json={'id':'../other'})).status,400)

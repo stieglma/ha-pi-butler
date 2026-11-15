@@ -54,7 +54,7 @@ with the initialized plugin profile. The image's SDK-resolution assertion uses
 ES module import conditions because Pi does not expose a CommonJS root export.
 Marketplace MCP support is optional and pi-mcp-adapter is intentionally absent.
 
-## KNX acceptance candidate (2026-11-15)
+## KNX runtime in 1.2.0 (2026-11-15)
 
 - XKNX Editor 0.14.0, commit `b65edca16260b638cfea329b57b7034f100a09ad`.
   [Pinned source](https://github.com/XKNX/xknx-editor/tree/b65edca16260b638cfea329b57b7034f100a09ad),
