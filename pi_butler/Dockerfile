@@ -52,7 +52,7 @@ FROM base AS knx-dependencies
 COPY --from=ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa /uv /usr/local/bin/uv
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
-ADD --checksum=sha256:755bf41c846dd593be0ae816aacb125de412ef1c364268c773b70a44d91e6059 https://codeload.github.com/XKNX/xknx-editor/tar.gz/b65edca16260b638cfea329b57b7034f100a09ad /tmp/editor.tar.gz
+ADD --checksum=sha256:02ae346472367ec2f149e4183a187d16418e00bd47face5b2d64e3716e1eb5a5 https://codeload.github.com/XKNX/xknx-editor/tar.gz/88f5870886877acdae3b16a3b95c2b3e54d216c8 /tmp/editor.tar.gz
 RUN mkdir -p /opt/knx/source \
     && tar -xzf /tmp/editor.tar.gz -C /opt/knx/source --strip-components=1 \
     && rm /tmp/editor.tar.gz

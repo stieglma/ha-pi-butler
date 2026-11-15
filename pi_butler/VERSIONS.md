@@ -54,11 +54,11 @@ with the initialized plugin profile. The image's SDK-resolution assertion uses
 ES module import conditions because Pi does not expose a CommonJS root export.
 Marketplace MCP support is optional and pi-mcp-adapter is intentionally absent.
 
-## KNX runtime in 1.2.0 (2026-11-15)
+## KNX runtime in 1.2.1 (2026-11-15)
 
-- XKNX Editor 0.14.0, commit `b65edca16260b638cfea329b57b7034f100a09ad`.
-  [Pinned source](https://github.com/XKNX/xknx-editor/tree/b65edca16260b638cfea329b57b7034f100a09ad),
-  archive SHA-256 `755bf41c846dd593be0ae816aacb125de412ef1c364268c773b70a44d91e6059`.
+- XKNX Editor 0.14.1, commit `88f5870886877acdae3b16a3b95c2b3e54d216c8`.
+  [Pinned source](https://github.com/XKNX/xknx-editor/tree/88f5870886877acdae3b16a3b95c2b3e54d216c8),
+  archive SHA-256 `02ae346472367ec2f149e4183a187d16418e00bd47face5b2d64e3716e1eb5a5`.
 - Independent managed CPython 3.13.14; upstream `uv.lock` pins all editor Python
   dependencies, including FastMCP 4.2.0. No editor dependency enters Butler's venv.
 - xknxproject source commit `f97db068884eca2b460abb1fb4db2262345f7f47`, archive
