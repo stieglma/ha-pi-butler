@@ -16,12 +16,14 @@ panel_icon: mdi:robot
 homeassistant_api: true
 hassio_api: true
 hassio_role: homeassistant
+privileged: [NET_ADMIN]
 options:
   knx:
     enabled: false
     read_enabled: true
     repository_directory: knx_editor
     project_filename: project.knxproj
+    gateway_addresses: []
   repository:
     url: ""
     checkout_branch: main
@@ -44,6 +46,7 @@ schema:
     read_enabled: bool
     repository_directory: str
     project_filename: str
+    gateway_addresses: [str]
   repository:
     url: str
     checkout_branch: str

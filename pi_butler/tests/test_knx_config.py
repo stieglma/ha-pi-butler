@@ -10,8 +10,8 @@ from butler.onboarding import Onboarding
 class KnxConfigTests(unittest.TestCase):
     def test_old_options_keep_switches_and_gain_default_location(self):
         self.assertEqual(normalize_options({}), DEFAULT)
-        options = normalize_options({'enabled': True, 'read_enabled': False})
-        self.assertTrue(options['enabled'])
+        options = normalize_options({'enabled': False, 'read_enabled': False})
+        self.assertFalse(options['enabled'])
         self.assertFalse(options['read_enabled'])
         self.assertEqual(options['repository_directory'], 'knx_editor')
         self.assertEqual(options['project_filename'], 'project.knxproj')
@@ -83,7 +83,7 @@ class KnxSetupTests(unittest.IsolatedAsyncioTestCase):
             (root / 'repository/custom').mkdir(parents=True)
             (root / 'repository/custom/house.knxproj').write_bytes(b'not imported')
             config = root / 'knx.json'
-            options = {'enabled': True, 'repository_directory': 'custom', 'project_filename': 'house.knxproj'}
+            options = {'enabled': True, 'repository_directory': 'custom', 'project_filename': 'house.knxproj', 'gateway_addresses': ['192.0.2.10']}
             config.write_text(json.dumps(options))
             with patch('butler.onboarding.KNX_CONFIG', config), \
                  patch('butler.onboarding.workspace.ROOT', root), \

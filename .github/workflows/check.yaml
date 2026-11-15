@@ -37,6 +37,7 @@ jobs:
         with:
           version: "0.11.28"
       - run: uv sync --project pi_butler --locked --python 3.11
+      - run: uv run --project pi_butler --locked bash pi_butler/tests/firewall_smoke.sh
       - run: uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
       - if: failure()
         run: docker logs pi-butler-smoke || true

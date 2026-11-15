@@ -1,10 +1,12 @@
 """Configured KNX repository location; never opens a project in the editor."""
 import os
+import ipaddress
 from pathlib import PurePosixPath
 import stat
 
 DEFAULT = {'enabled': False, 'read_enabled': True,
-           'repository_directory': 'knx_editor', 'project_filename': 'project.knxproj'}
+           'repository_directory': 'knx_editor', 'project_filename': 'project.knxproj',
+           'gateway_addresses': []}
 
 
 def normalize_options(value):
@@ -24,6 +26,26 @@ def normalize_options(value):
             or len(filename) > 200 or filename.lower() == '.knxproj'
             or any(ord(c) < 32 or c in '/\\' for c in filename)):
         raise ValueError('KNX project filename must be a .knxproj filename without folders')
+    values = options['gateway_addresses']
+    if not isinstance(values, list) or len(values) > 32:
+        raise ValueError('KNX gateway addresses must be a list of at most 32 literal IP addresses')
+    addresses = []
+    for value in values:
+        if not isinstance(value, str) or '%' in value:
+            raise ValueError('Use literal KNX gateway IP addresses, without hostnames or scope IDs')
+        try:
+            address = ipaddress.ip_address(value)
+        except ValueError:
+            raise ValueError('Invalid KNX gateway IP address') from None
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+            address = address.ipv4_mapped
+        if address.is_unspecified or address.is_loopback or address.is_multicast or str(address) == '255.255.255.255':
+            raise ValueError('KNX gateway must be a unicast address, not loopback, multicast or unspecified')
+        if str(address) not in addresses:
+            addresses.append(str(address))
+    if options['enabled'] and not addresses:
+        raise ValueError('Configure knx.gateway_addresses before enabling KNX; refusing unprotected gateway access')
+    options['gateway_addresses'] = addresses
     return options
 
 

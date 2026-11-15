@@ -27,7 +27,7 @@ from pathlib import Path
 Path(sys.argv[1]).write_text(json.dumps(yaml.safe_load(Path('pi_butler/config.yaml').read_text())['options']))
 PY
 task_volume=$(docker volume create)
-docker create --name "$container_name" -e SUPERVISOR_TOKEN=boundary-test-placeholder \
+docker create --name "$container_name" --cap-add NET_ADMIN -e SUPERVISOR_TOKEN=boundary-test-placeholder \
   -v "$task_volume:/data" -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test
 docker cp "$task_data/options.json" "$container_name:/data/options.json"
 docker start "$container_name"
@@ -39,6 +39,12 @@ for attempt in $(seq 1 60); do
   sleep 1
 done
 docker exec "$container_name" test -S /run/butler/pi/sessiond.sock
+docker exec "$container_name" /opt/venv/bin/python3 -c '
+from pathlib import Path
+for line in Path("/proc/1/status").read_text().splitlines():
+    if line.startswith(("CapEff:", "CapPrm:", "CapInh:", "CapBnd:", "CapAmb:")):
+        assert not int(line.split()[1], 16) & (1 << 12), "PID 1 retained NET_ADMIN"
+'
 # Setup/notes socket must be inherited by ingress, without granting pi its group.
 for attempt in $(seq 1 30); do
   if docker exec "$container_name" test -S /run/butler/workspace/ui.sock; then break; fi
@@ -94,7 +100,7 @@ import json
 from pathlib import Path
 p = Path("/data/options.json")
 options = json.loads(p.read_text())
-options["knx"] = {"enabled": True, "read_enabled": True}
+options["knx"] = {"enabled": True, "read_enabled": True, "gateway_addresses": ["192.0.2.10", "2001:db8::10"]}
 p.write_text(json.dumps(options))
 '
 docker start "$container_name"
@@ -120,7 +126,7 @@ import json, urllib.request, urllib.error
 from pathlib import Path
 mcp = json.loads(Path("/data/pi/mcp.json").read_text())["mcpServers"]
 assert mcp["pi_butler_knx"]["args"] == ["--knx"]
-# This startup used the old two-switch options above; new defaults must migrate.
+# This startup used the old source-location options above; new defaults must migrate.
 knx = json.loads(Path("/etc/pi-butler/knx.json").read_text())
 assert knx["repository_directory"] == "knx_editor"
 assert knx["project_filename"] == "project.knxproj"

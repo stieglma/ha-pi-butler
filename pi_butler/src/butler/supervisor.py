@@ -16,6 +16,7 @@ from .access import redact
 from .permissions import DEFAULT, migrate_permissions
 from .workspace import validate_config
 from .knx_config import normalize_options
+from .knx_firewall import install as install_knx_firewall, drop_network_admin
 
 PI, ACCESS, INGRESS, KNX, SHARED = 1000, 1001, 1002, 1003, 1100
 STOP = threading.Event()
@@ -181,6 +182,10 @@ def prepare():
         value = options['limits'][name]
         if type(value) is not int or not lo <= value <= hi:
             raise RuntimeError('Invalid limit: ' + name)
+    # Mandatory even with the editor disabled: protect configured gateways and
+    # standard KNX traffic before profile/terminal/agent processes can exist.
+    install_knx_firewall(knx)
+    drop_network_admin()
     directory('/data', 0, 0, 0o755)
     for name in ('home', 'workspaces', 'pi', 'pi-web', 'diagnostics'):
         directory('/data/' + name, PI, PI, 0o700)
@@ -336,7 +341,7 @@ def main():
         # Reap adopted orphan children as well as supervised children.
         for name, process in children:
             if process.poll() is not None and process.pid in critical:
-                log.error('%s exited; shutting down for Supervisor restart', name)
+                log.error('%s exited with status %s; shutting down for Supervisor restart', name, process.returncode)
                 exit_code = 1
                 STOP.set()
         try:

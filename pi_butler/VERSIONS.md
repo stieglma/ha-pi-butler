@@ -66,7 +66,11 @@ Marketplace MCP support is optional and pi-mcp-adapter is intentionally absent.
 - Editor source/license and dependency source archive are retained in the image.
   The image does not bundle .NET/ETS signing or key-extraction helpers.
 
-These pins have local dependency-install/transport evidence and a passing amd64
-build/container smoke on Colima (2026-11-15), with the test environment and MCP
-readiness corrections described in [KNX implementation](../docs/KNX-EDITOR-IMPLEMENTATION.md).
-Live HA acceptance remains open.
+The source-location build passed amd64 image/container checks locally and in CI.
+The later mandatory-firewall build adds Debian nftables (security-updated with
+other OS packages) and requests NET_ADMIN only for initialization. The exact
+production policy passed a native Colima Linux kernel probe, including both IP
+families and capability removal. Full app startup must run on native amd64;
+Colima's amd64 user-mode netlink emulation is unsupported. See
+[testing](../docs/TESTING.md) and PR checks for evidence for the current commit.
+Live HAOS kernel/AppArmor/Supervisor acceptance remains open.

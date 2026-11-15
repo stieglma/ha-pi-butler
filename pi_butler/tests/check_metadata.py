@@ -10,9 +10,9 @@ assert config['slug'] == 'pi_butler'
 assert config['ingress'] and config['homeassistant_api']
 assert config['panel_admin'] is True and config['backup'] == 'cold'
 assert config['options']['knx'] == {'enabled': False, 'read_enabled': True,
-                                     'repository_directory': 'knx_editor', 'project_filename': 'project.knxproj'}
+                                     'repository_directory': 'knx_editor', 'project_filename': 'project.knxproj', 'gateway_addresses': []}
 assert config['hassio_role'] == 'homeassistant'
-assert not config.get('host_network') and not config.get('privileged') and not config.get('map')
+assert not config.get('host_network') and config.get('privileged') == ['NET_ADMIN'] and not config.get('map')
 assert not config.get('ports')
 assert 'ha_access' not in config['options'] and 'ha_access' not in config['schema']
 assert set(config['options']) == set(config['schema'])

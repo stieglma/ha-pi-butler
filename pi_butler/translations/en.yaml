@@ -14,6 +14,9 @@ configuration:
       project_filename:
         name: KNX project filename
         description: Exact .knxproj filename inside that folder, including its extension. Defaults to project.knxproj. No wildcard search or automatic import.
+      gateway_addresses:
+        name: Protected KNX gateway IP addresses
+        description: List every KNX interface IPv4/IPv6 address, including alternate addresses. Required before enabling KNX. Only the KNX service can reach these addresses, on any port. Standard KNX ports and multicast/broadcast are also blocked for agents. Changes require an app restart.
   repository:
     name: Configuration repository
     description: Optional independent Git checkout. Authenticate in the Pi Web terminal. Restart the app after changes.

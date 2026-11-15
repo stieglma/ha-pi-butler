@@ -7,7 +7,7 @@ ENV PYTHONPATH=/opt/butler \
     PYTHONUNBUFFERED=1
 RUN test "$TARGETARCH" = amd64 \
     && apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-client python3 libstdc++6 util-linux passwd \
+    && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-client python3 libstdc++6 util-linux passwd nftables \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 1100 butler-client \
     && usermod -l pi -d /data/home -s /bin/bash node \

@@ -44,6 +44,7 @@ PYTHONPATH=pi_butler/src uv run --project pi_butler --locked python -m unittest 
 uv run --project pi_butler --locked python pi_butler/tests/check_metadata.py
 node --test pi_butler/tests/test_browser_policy.mjs pi_butler/tests/test_starters.mjs
 docker build --platform linux/amd64 -t pi-butler:test pi_butler
+uv run --project pi_butler --locked bash pi_butler/tests/firewall_smoke.sh
 uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
 ```
 
@@ -59,6 +60,10 @@ registration lives in `pi_butler/bundled-packages.json`, copied after dependency
 installation. Change dependency manifests and regenerate locks only when their
 inputs change. See [testing](docs/TESTING.md) for image/plugin checks and remaining
 live acceptance work.
+
+The full startup/firewall smokes require native Linux/amd64 and NET_ADMIN inside
+disposable containers; amd64 user-mode emulation cannot translate nftables netlink
+calls. A native Colima kernel probe is documented in docs/TESTING.md.
 
 The Docker smoke check uses a disposable data directory and placeholder upstream
 credential. It tests startup, privilege boundaries and shutdown without contacting

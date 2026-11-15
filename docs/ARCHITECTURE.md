@@ -22,10 +22,21 @@ A small root PID 1 supervisor initializes protected storage, launches children
 with explicit identities and clean environments, reaps processes and stops the
 app on critical service failure. Pi Web, the session daemon, agent and terminal
 run as the Pi user (uid 1000). The HA access service runs as uid 1001; ingress
-runs as uid 1002. Only the access service receives the Supervisor credential.
+runs as uid 1002. The optional KNX editor and finite read gateway run as uid 1003. Only the access service receives the Supervisor credential.
 Agent-facing processes have no capabilities and cannot modify protected service
 code, options or policy storage. A separate storage-accounting worker retains
 only DAC override capability to count private files; artifact retention runs as Pi.
+
+Before launching any agent/profile process, root atomically installs a dual-stack
+nftables egress policy in the container's private network namespace. Configured KNX
+gateway addresses on all ports, standard KNX port 3671 on any address, multicast
+and broadcast are reachable only by uid 1003 (with essential IPv6 control traffic
+exempted). `NET_ADMIN` is requested for startup, then removed from PID 1's
+capability sets; children have none. Missing capability/kernel support or policy
+failure prevents agent startup. Known gateway addresses remain protected even
+when the editor is disabled. All gateway/alternate IPs must be configured; unlisted
+custom-port interfaces, external relays and authorized HA actions remain separate
+paths. Tests and limitations are in the KNX implementation document.
 
 The Pi-owned MCP adapter exposes finite tools over a group-protected Unix socket.
 It cannot forward arbitrary API requests or save permissions. Ingress reaches

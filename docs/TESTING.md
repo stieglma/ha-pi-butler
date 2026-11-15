@@ -35,8 +35,12 @@ colima status
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 ```
 
-This uses the current Docker context. The app remains amd64-only, including when
-these tests run through emulation on Apple Silicon.
+This uses the current Docker context. The app remains amd64-only. Image builds,
+unit and package tests can run under emulation on Apple Silicon. Mandatory
+firewall/full-app startup needs native Linux/amd64: qemu user-mode netlink calls
+are unsupported and startup intentionally fails closed. Use native amd64 CI for
+the complete image; the native Colima policy probe below tests the same production
+firewall code against the real Linux kernel without implying ARM app support.
 
 With Docker available, run the same checks as the
 [CI workflow](../.github/workflows/check.yaml):
@@ -48,6 +52,7 @@ docker run --rm --entrypoint /opt/venv/bin/python3 -v "$PWD/pi_butler/tests:/tes
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/plugin_smoke.mjs
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/marketplace_smoke.mjs
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/model_status_smoke.mjs
+uv run --project pi_butler --locked bash pi_butler/tests/firewall_smoke.sh
 uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
 ```
 
@@ -110,22 +115,52 @@ was deliberately skipped; optional download-cache mounts have not been implement
 ## KNX acceptance candidate
 
 The optional KNX integration has separate [implementation and HA acceptance
-steps](KNX-EDITOR-IMPLEMENTATION.md). New unit tests cover active-admin identity,
-HTTP/WebSocket credentials, finite read tools and denied arguments. The synthetic
-`knx_mcp_smoke.py` checks pinned FastMCP JSON/SSE framing and bearer authentication
-without opening a project or GUI. The container smoke now also enables KNX and
-checks process startup/private boundaries. The amd64 build and expanded container
-smoke passed locally on Colima on 2026-11-15 after reproducing and fixing the clean
-environment mismatch and separate MCP startup race. Both boundary probes retain
-all credential/capability assertions; endpoint checks wait for each listener and
-still require denied responses. Runtime version/native checks, all 98 Python
-container tests, and the plugin, marketplace and model-readiness smokes also passed
-locally against that image. Original-project import, export,
-HA ingress, bus connectivity and device support have no acceptance evidence yet.
+steps](KNX-EDITOR-IMPLEMENTATION.md). Unit tests cover active-admin identity,
+HTTP/WebSocket credentials, finite reads, source paths, gateway IP validation,
+and fail-closed firewall setup. `knx_mcp_smoke.py` checks pinned FastMCP JSON/SSE
+framing and authentication without a project or GUI.
 
+The earlier source-location build passed 98 container unit tests, package/runtime
+smokes and full app smoke locally and in CI. Do not apply that evidence to the
+later mandatory-firewall build: it changes privileges and startup. The current
+production policy passed the native Colima kernel probe described below; native
+amd64 CI must pass the new firewall smoke and full app smoke for the exact commit.
+Actual HAOS/AppArmor, original-project import/export, ingress and hardware support
+remain unverified.
+
+`firewall_smoke.sh` creates a disposable IPv4/IPv6 Docker network, with echo
+servers inside its test container only. The arbitrary-Python client initially
+reaches the endpoints, then is denied as uid 1000/1001, while uid 1003 remains
+allowed. Actual kernel rejection counters must increase: a missing route or failed
+client is not accepted as proof. The checks cover TCP/UDP and custom gateway ports,
+standard port 3671 on an unlisted address, multicast/broadcast, raw-packet/UID/
+firewall tampering, atomic rule replacement and rollback, and NET_ADMIN removal.
+It then starts the real supervisor without NET_ADMIN and verifies failure before
+any agent directory is initialized. The full container smoke grants NET_ADMIN at
+creation, asserts PID 1 drops it, and checks all existing credential/process limits.
+The test scripts never contact an actual KNX interface.
+
+On Apple Silicon, run the identical rule generator, apply path and kernel probe
+using native Linux Python in a disposable toolbox. The following is a kernel
+policy test, not a build/runtime test for the amd64 app:
+
+```sh
+export PATH="$(brew --prefix docker)/bin:$PATH"
+task_firewall_network="butler-native-firewall-$RANDOM-$$"
+trap 'docker network rm "$task_firewall_network" >/dev/null 2>&1 || true' EXIT
+docker network create --ipv6 --subnet fd4b:4e58:aa31::/64 "$task_firewall_network"
+docker run --rm --platform linux/arm64 --cap-add NET_ADMIN \
+  --network "$task_firewall_network" -e PYTHONPATH=/source \
+  -v "$PWD/pi_butler/src:/source:ro" -v "$PWD/pi_butler/tests:/tests:ro" \
+  --entrypoint /bin/sh python:3.11-slim -c \
+  'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nftables util-linux >/dev/null && python3 /tests/firewall_probe.py'
+```
+
+This optional toolbox follows the installed native Python/Debian image; the
+production app dependencies and architecture remain pinned separately.
 
 KNX repository source options default to `knx_editor/project.knxproj`. Tests cover
-old-option migration, custom nested directories/filenames, missing files, exact
-selection without fallback, and rejection of traversal/symlink/nonregular sources.
-Setup reports only presence and manual-import status. The container smoke also
-checks migration from the old two-switch options to the new location defaults.
+source-location default migration, custom paths, exact selection without fallback,
+and rejection of traversal/symlink/nonregular sources. Setup reports presence and
+manual import only. `knx.gateway_addresses` must now contain all interface IPs
+before KNX can be enabled; the firewall never infers these from mutable repo files.
