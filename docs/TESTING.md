@@ -26,6 +26,22 @@ prove behavior with live services.
 
 ## Image and runtime checks
 
+On macOS with Colima, ensure the Docker CLI is on `PATH` and Colima is running.
+For a Homebrew installation whose Docker CLI is not linked, use:
+
+```sh
+export PATH="$(brew --prefix docker)/bin:$PATH"
+colima status
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+```
+
+This uses the current Docker context. The app remains amd64-only. Image builds,
+unit and package tests can run under emulation on Apple Silicon. Mandatory
+firewall/full-app startup needs native Linux/amd64: qemu user-mode netlink calls
+are unsupported and startup intentionally fails closed. Use native amd64 CI for
+the complete image; the native Colima policy probe below tests the same production
+firewall code against the real Linux kernel without implying ARM app support.
+
 With Docker available, run the same checks as the
 [CI workflow](../.github/workflows/check.yaml):
 
@@ -36,6 +52,8 @@ docker run --rm --entrypoint /opt/venv/bin/python3 -v "$PWD/pi_butler/tests:/tes
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/plugin_smoke.mjs
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/marketplace_smoke.mjs
 docker run --rm --user 1000:1000 --entrypoint node -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/model_status_smoke.mjs
+docker run --rm --entrypoint /opt/knx/venv/bin/python -e PYTHONPATH=/source -v "$PWD/pi_butler/src:/source:ro" -v "$PWD/pi_butler/tests:/tests:ro" pi-butler:test /tests/knx_editor_auth_smoke.py
+uv run --project pi_butler --locked bash pi_butler/tests/firewall_smoke.sh
 uv run --project pi_butler --locked bash pi_butler/tests/container_smoke.sh
 ```
 
@@ -93,3 +111,61 @@ Also check from the actual Pi Web terminal; the probe is not exhaustive.
 Cache reuse measurements and Supervisor build-cache retention remain unmeasured
 optimization checks, not release acceptance requirements. CI cache import/export
 was deliberately skipped; optional download-cache mounts have not been implemented.
+
+
+## KNX acceptance candidate
+
+The optional KNX integration has separate [implementation and HA acceptance
+steps](KNX-EDITOR-IMPLEMENTATION.md). Unit tests cover active-admin identity,
+HTTP/WebSocket credentials, finite reads, source paths, gateway IP validation,
+and fail-closed firewall setup. `knx_mcp_smoke.py` checks pinned FastMCP JSON/SSE
+framing and authentication without a project or GUI. `knx_editor_auth_smoke.py`
+runs the production launcher and pinned editor plugin, checks that the managed
+UI token accessor cannot disclose the supervisor credential, and verifies that
+only that credential authenticates after restarts with empty or user-supplied
+settings tokens. It uses loopback only, without a project, GUI session or bus.
+
+The earlier source-location build passed 98 container unit tests, package/runtime
+smokes and full app smoke locally and in CI. Do not apply that evidence to the
+later mandatory-firewall build: it changes privileges and startup. The current
+production policy passed the native Colima kernel probe described below; native
+amd64 CI must pass the new firewall smoke and full app smoke for the exact commit.
+Actual HAOS/AppArmor, original-project import/export, ingress and hardware support
+remain unverified.
+
+`firewall_smoke.sh` creates a disposable IPv4/IPv6 Docker network, with echo
+servers inside its test container only. The arbitrary-Python client initially
+reaches the endpoints, then is denied as uid 1000/1001, while uid 1003 remains
+allowed. Actual kernel rejection counters must increase: a missing route or failed
+client is not accepted as proof. The checks cover TCP/UDP and custom gateway ports,
+standard port 3671 on an unlisted address, multicast/broadcast, raw-packet/UID/
+firewall tampering, atomic rule replacement and rollback, and NET_ADMIN removal.
+It then starts the real supervisor without NET_ADMIN and verifies failure before
+any agent directory is initialized. The full container smoke grants NET_ADMIN at
+creation, asserts PID 1 drops it, and checks all existing credential/process limits.
+The test scripts never contact an actual KNX interface.
+
+On Apple Silicon, run the identical rule generator, apply path and kernel probe
+using native Linux Python in a disposable toolbox. The following is a kernel
+policy test, not a build/runtime test for the amd64 app:
+
+```sh
+export PATH="$(brew --prefix docker)/bin:$PATH"
+task_firewall_network="butler-native-firewall-$RANDOM-$$"
+trap 'docker network rm "$task_firewall_network" >/dev/null 2>&1 || true' EXIT
+docker network create --ipv6 --subnet fd4b:4e58:aa31::/64 "$task_firewall_network"
+docker run --rm --platform linux/arm64 --cap-add NET_ADMIN \
+  --network "$task_firewall_network" -e PYTHONPATH=/source \
+  -v "$PWD/pi_butler/src:/source:ro" -v "$PWD/pi_butler/tests:/tests:ro" \
+  --entrypoint /bin/sh python:3.11-slim -c \
+  'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nftables util-linux >/dev/null && python3 /tests/firewall_probe.py'
+```
+
+This optional toolbox follows the installed native Python/Debian image; the
+production app dependencies and architecture remain pinned separately.
+
+KNX repository source options default to `knx_editor/project.knxproj`. Tests cover
+source-location default migration, custom paths, exact selection without fallback,
+and rejection of traversal/symlink/nonregular sources. Setup reports presence and
+manual import only. `knx.gateway_addresses` must now contain all interface IPs
+before KNX can be enabled; the firewall never infers these from mutable repo files.

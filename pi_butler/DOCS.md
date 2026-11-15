@@ -457,7 +457,7 @@ before relying on it; persistence across actual HA update/restore is pending.
 
 The root supervisor protects app options and image code and launches processes
 with clean environments and no-new-privileges/capabilities. Pi runs as uid 1000;
-the HA service as uid 1001 and ingress as uid 1002. Only the HA service receives
+the HA service as uid 1001, ingress as uid 1002, and KNX services as uid 1003. Only the HA service receives
 the Supervisor token. Pi reaches approved tools through a group-protected Unix
 socket, never a general HTTP proxy. Policy changes use the separate ingress
 settings UI and protected management socket.
@@ -481,3 +481,64 @@ the last five retained runs by default, explains conditions, branches and action
 outcomes, and correlates relevant entity history and available Core logs. It is
 read-only and reports missing or expired evidence rather than assuming success or
 failure. Configuration changes remain a separately requested task.
+
+## Optional KNX Editor (1.1.0-beta.1)
+
+Configure every gateway IP in `knx.gateway_addresses`, then enable `knx.enabled` and restart. **KNX Editor** appears in
+Butler's menu for verified HA administrators. Import a project copy using the UI;
+its private native files persist in `/data/knx`. The automatically configured
+`pi_butler_knx` MCP offers six project reads. `knx.read_enabled: false` denies
+assistant reads without restricting the privileged editor UI. Option changes
+require an app restart. Disabling retains data and removes the module entry/MCP.
+
+This is an acceptance candidate: automatic Git checkpoints/exports and project
+rollback are not implemented. Do not treat it as the leading project store yet.
+HA backups now stop the app briefly to preserve SQLite consistency. The original
+project remains the fallback. See [implementation and HA test steps](../docs/KNX-EDITOR-IMPLEMENTATION.md)
+for the exact boundaries, missing features and unverified build/HA behavior.
+
+Set `knx.repository_directory` (default `knx_editor`) and `knx.project_filename`
+(default `project.knxproj`) to identify the repository source. For example:
+
+```yaml
+knx:
+  enabled: true
+  read_enabled: true
+  repository_directory: knx_editor
+  project_filename: project.knxproj
+  gateway_addresses:
+    - 192.0.2.10  # Replace with your real KNX/IP gateway address.
+```
+
+Paths are relative to the configured Git repository. Restart after changes.
+**Setup & house notes** checks for the exact file `knx_editor/project.knxproj`;
+set `project_filename` to your existing name if desired. This check does not
+validate its contents, import it, or synchronize it with the active editor project.
+Import a copy manually through KNX Editor; manual uploads accept any filename.
+The private working format is `.xknx`.
+
+Exclude only the editor-only repository folder (`knx_editor/` by default) from
+restart-after-sync in the separate HA Git app. Keep `knx/` included in normal
+restart detection if it contains Home Assistant entity YAMLs. Pi Butler does not
+modify those restart rules. Private app storage `/data/knx` and the ingress URL
+`butler/knx/` are independent of the configured repository folder.
+
+
+The gateway list is required when enabling KNX. Include all real IPv4/IPv6 and
+alternate interface addresses; the example address above is a documentation-only
+placeholder. Hostnames, CIDRs, loopback and multicast addresses are rejected.
+Addresses are normalized and protected on **all ports**, including custom ports.
+Startup also blocks agent traffic to standard KNX TCP/UDP port 3671, multicast and
+broadcast. Only the separate KNX user can send application traffic through those
+paths; an independently installed CLI or library runs under the blocked agent user.
+Essential IPv6 network control traffic is retained; agents have no raw-socket capability.
+
+The app now requests `NET_ADMIN` for trusted startup, installs its container-local
+firewall before any agent starts, and then drops that capability. Protection mode
+stays on, and no host firewall or host networking is used. If setup fails, the app
+refuses startup. An existing enabled beta must add the gateway list before upgrading.
+Keep the addresses when disabling the editor so direct gateway access stays blocked.
+With KNX disabled and an empty list, only standard-port/multicast/broadcast guards
+apply. Unlisted custom-port gateways, external relays/proxies and separately granted
+HA actions are not covered by that direct network restriction. Actual HAOS
+kernel/AppArmor compatibility still needs acceptance testing.

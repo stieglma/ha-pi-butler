@@ -53,3 +53,24 @@ extensions loaded through Pi 1.5.1 on Node 24.15.0 locally. Pi Web also started
 with the initialized plugin profile. The image's SDK-resolution assertion uses
 ES module import conditions because Pi does not expose a CommonJS root export.
 Marketplace MCP support is optional and pi-mcp-adapter is intentionally absent.
+
+## KNX acceptance candidate (2026-11-15)
+
+- XKNX Editor 0.14.0, commit `b65edca16260b638cfea329b57b7034f100a09ad`.
+  [Pinned source](https://github.com/XKNX/xknx-editor/tree/b65edca16260b638cfea329b57b7034f100a09ad),
+  archive SHA-256 `755bf41c846dd593be0ae816aacb125de412ef1c364268c773b70a44d91e6059`.
+- Independent managed CPython 3.13.14; upstream `uv.lock` pins all editor Python
+  dependencies, including FastMCP 4.2.0. No editor dependency enters Butler's venv.
+- xknxproject source commit `f97db068884eca2b460abb1fb4db2262345f7f47`, archive
+  SHA-256 `96f2423a08d898d40da99163459506d27f9fb6a3edd99d13b83677805bcf9954`.
+- Editor source/license and dependency source archive are retained in the image.
+  The image does not bundle .NET/ETS signing or key-extraction helpers.
+
+The source-location build passed amd64 image/container checks locally and in CI.
+The later mandatory-firewall build adds Debian nftables (security-updated with
+other OS packages) and requests NET_ADMIN only for initialization. The exact
+production policy passed a native Colima Linux kernel probe, including both IP
+families and capability removal. Full app startup must run on native amd64;
+Colima's amd64 user-mode netlink emulation is unsupported. See
+[testing](../docs/TESTING.md) and PR checks for evidence for the current commit.
+Live HAOS kernel/AppArmor/Supervisor acceptance remains open.

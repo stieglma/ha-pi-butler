@@ -1,4 +1,22 @@
 configuration:
+  knx:
+    name: KNX Editor (Beta)
+    description: Separater Admin-Editor. Änderungen werden noch nicht automatisch ins Git-Repository gesichert. Nach Änderungen der Optionen die App neu starten.
+    fields:
+      enabled:
+        name: KNX Editor aktivieren
+      read_enabled:
+        name: KNX-Projekt für den Assistenten lesbar
+        description: Nur lesende Projektwerkzeuge. Schreiben, Löschen und Buszugriff bleiben für den Assistenten gesperrt.
+      repository_directory:
+        name: KNX-Ordner im Repository
+        description: Relativ zum konfigurierten Git-Repository, standardmäßig knx_editor. Den Ordner mit KNX-Entitäts-YAMLs nicht von HA-Neustarts ausnehmen. Setup prüft hier die Projektdatei; Editor-Import bleibt manuell.
+      project_filename:
+        name: KNX-Projektdateiname
+        description: Exakter .knxproj-Dateiname mit Endung in diesem Ordner, standardmäßig project.knxproj. Keine Platzhaltersuche und kein automatischer Import.
+      gateway_addresses:
+        name: Geschützte KNX-Gateway-IP-Adressen
+        description: Alle IPv4-/IPv6-Adressen der KNX-Schnittstellen inklusive Alternativadressen eintragen. Vor Aktivierung erforderlich. Nur der KNX-Dienst erreicht diese Adressen auf beliebigen Ports. KNX-Standardports sowie Multicast/Broadcast sind für Agenten ebenfalls gesperrt. Änderungen erfordern einen App-Neustart.
   repository:
     name: Konfigurations-Repository
     description: Optionaler, unabhängiger Git-Checkout. Anmeldung im Pi-Web-Terminal. Nach Änderungen die App neu starten.

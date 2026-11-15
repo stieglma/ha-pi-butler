@@ -371,6 +371,20 @@ def applications(access):
 
     admin.router.add_get('/health', health)
 
+    async def admin_identity(req):
+        user_id = req.query.get('user_id', '')
+        if not re.fullmatch(r'[a-f0-9]{32}', user_id):
+            return web.json_response({'admin': False}, status=403)
+        try:
+            users = await access.upstream.ws('config/auth/list')
+            allowed = any(u.get('id') == user_id and u.get('is_active') is True
+                          and (u.get('is_owner') is True or 'system-admin' in u.get('group_ids', [])) for u in users)
+            return web.json_response({'admin': allowed}, status=200 if allowed else 403)
+        except Exception:
+            return web.json_response({'error': 'HA admin verification unavailable'}, status=503)
+
+    admin.router.add_get('/identity', admin_identity)
+
     async def save(req):
         try:
             return web.json_response(await access.save_permissions(await req.json()))
