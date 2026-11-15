@@ -8,6 +8,12 @@ configuration:
       read_enabled:
         name: KNX-Projekt für den Assistenten lesbar
         description: Nur lesende Projektwerkzeuge. Schreiben, Löschen und Buszugriff bleiben für den Assistenten gesperrt.
+      repository_directory:
+        name: KNX-Ordner im Repository
+        description: Relativ zum konfigurierten Git-Repository, standardmäßig knx_editor. Den Ordner mit KNX-Entitäts-YAMLs nicht von HA-Neustarts ausnehmen. Setup prüft hier die Projektdatei; Editor-Import bleibt manuell.
+      project_filename:
+        name: KNX-Projektdateiname
+        description: Exakter .knxproj-Dateiname mit Endung in diesem Ordner, standardmäßig project.knxproj. Keine Platzhaltersuche und kein automatischer Import.
   repository:
     name: Konfigurations-Repository
     description: Optionaler, unabhängiger Git-Checkout. Anmeldung im Pi-Web-Terminal. Nach Änderungen die App neu starten.

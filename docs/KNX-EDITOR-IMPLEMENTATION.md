@@ -62,6 +62,31 @@ editor workspace. This release does not automatically open repo files. For the
 first HA test, upload a **copy** through the admin UI and save a native `.xknx`
 inside the editor's file folder. Download exports manually.
 
+The source location is configurable relative to the configured Git repository:
+
+```yaml
+knx:
+  enabled: true
+  read_enabled: true
+  repository_directory: knx_editor
+  project_filename: project.knxproj
+```
+
+The exact default source is `knx_editor/project.knxproj`. To keep an existing
+filename, set `project_filename` to that filename including `.knxproj`; the
+folder can also be nested, such as `projects/knx_editor`. Absolute paths,
+traversal and symlinked sources are rejected. Restart after changing options.
+**Setup & house notes** reports presence of that exact file when KNX is enabled.
+It checks file metadata as the Pi user, without reading/importing project content.
+Other `.knxproj` files are not selected as a fallback.
+
+There is still **no automatic import, active-project selection or repository
+synchronization**. A source marked Ready means the repository file exists, not
+that the editor has opened it. Upload/import a copy manually; its filename may
+be anything in the editor UI. The working format is `.xknx`, kept separately in
+`/data/knx/projects`. A future repository import must be an explicit validated
+admin action rather than privileged auto-loading of agent-writable repo files.
+
 The next increment should use the upstream UI-thread backup service to produce a
 consistent native backup and export from the same locked project revision. A
 checkpoint is successful only after both outputs and hashes exist. A failed export
@@ -69,12 +94,12 @@ must leave an unsaved-change/error state, not a successful checkpoint. SQLite fi
 must not be copied by a file watcher during writes. Capture all project mutation
 sources, including admin UI, before claiming complete versioning.
 
-Proposed delivery layout in the private config repo (not implemented):
+Proposed delivery layout with the default configured folder/filename (not implemented):
 
 ```
-knx/<project-id>/project.xknx
-knx/<project-id>/project.knxproj
-knx/<project-id>/checkpoint.json
+knx_editor/project.xknx
+knx_editor/project.knxproj
+knx_editor/checkpoint.json
 ```
 
 Only a narrow explicit checkpoint export should cross from private storage to a
@@ -88,8 +113,8 @@ proposal until the backup/export integration is proven.
 
 ## Not implemented or proven
 
-Automatic checkpoints, Git delivery into `knx/`, synchronized `.knxproj` exports,
-rollback/history UI, assistant writes and scoped write grants remain open. The
+Automatic checkpoints, Git delivery into the configured editor folder
+(default `knx_editor/`), synchronized `.knxproj` exports, rollback/history UI, assistant writes and scoped write grants remain open. The
 upstream native history/backups UI is available, but is not a substitute for those
 Pi Butler features. ETS signature/key-extraction helpers and .NET are not bundled;
 export interoperability must be tested. KNX routing/discovery through the app
@@ -103,7 +128,7 @@ and a synthetic authenticated FastMCP 4.2.0 JSON/SSE transport smoke. This uses 
 editor GUI session, original project or KNX hardware. The amd64 image and expanded container smoke have now passed locally on Colima
 (2026-11-15). The original CI failure was reproduced locally: the KNX boundary
 probe inherited the synthetic Supervisor token from `docker exec`. Both probes
-now share a clean Pi environment. Runtime checks, 93 Python tests inside the image,
+now share a clean Pi environment. Runtime checks, 98 Python tests inside the image,
 and all three package/marketplace/model-readiness smokes also passed locally.
 A second reproduced startup race required
 waiting separately for the web and MCP listeners before checking their denied
@@ -137,8 +162,11 @@ commit, Core and Supervisor versions. Then:
 6. Test unsigned export/reimport with the project copy and compare semantics.
    Record failures; do not infer ETS acceptance from successful reimport.
 
-Before future automatic KNX delivery, add `knx/` to `restart_ignore` in the separate
-HA Git app and verify it. Bus/programming tests remain a separate controlled step
+Before future automatic KNX delivery, add the configured editor-only folder
+(default `knx_editor/`) to `restart_ignore` in the separate HA Git app and verify
+it. Keep `knx/` out of that exclusion when it contains HA entity YAMLs: changes
+there must still trigger the normal HA restart. Pi Butler does not edit the HA
+Git app's configuration. Bus/programming tests remain a separate controlled step
 on the target installation. The longer acceptance list in the handoff still applies.
 
 ## Bundled source and license

@@ -12,8 +12,10 @@ from datetime import datetime, timezone
 
 from aiohttp import ClientSession, ClientTimeout, web
 from . import workspace
+from .knx_config import normalize_options, project_source_check
 
 MEMORY = Path('/data/pi/house-memory.md')
+KNX_CONFIG = Path('/etc/pi-butler/knx.json')
 INITIAL_MEMORY = '''# House notes
 
 ## User-provided facts and preferences
@@ -166,6 +168,14 @@ class Onboarding:
         else:
             checks['git'] = {'state': 'pending', 'help': 'Complete repository setup and terminal Git authentication first.'}
             checks['repository_project'] = {'state': 'pending', 'help': 'Registered automatically after repository setup succeeds.'}
+        try:
+            knx = normalize_options(json.loads(KNX_CONFIG.read_text()))
+            if knx['enabled']:
+                checks['knx_project'] = await asyncio.to_thread(project_source_check, knx, workspace.ROOT / 'repository')
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError):
+            checks['knx_project'] = {'state': 'unknown', 'help': 'KNX repository location could not be checked. Inspect app options and restart.'}
         checks['model'] = await asyncio.to_thread(model_check)
         self.checks = {'checks': checks, 'checked_at': datetime.now(timezone.utc).isoformat()}
 

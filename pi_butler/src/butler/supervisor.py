@@ -15,6 +15,7 @@ import time
 from .access import redact
 from .permissions import DEFAULT, migrate_permissions
 from .workspace import validate_config
+from .knx_config import normalize_options
 
 PI, ACCESS, INGRESS, KNX, SHARED = 1000, 1001, 1002, 1003, 1100
 STOP = threading.Event()
@@ -172,9 +173,7 @@ def prepare():
     legacy = options.get('ha_access')
     if legacy is None and previous.is_file() and not previous.is_symlink():
         legacy = json.loads(previous.read_text()).get('ha_access')
-    knx = options.setdefault('knx', {'enabled': False, 'read_enabled': True})
-    if set(knx) != {'enabled', 'read_enabled'} or any(type(v) is not bool for v in knx.values()):
-        raise RuntimeError('Invalid KNX options')
+    knx = options['knx'] = normalize_options(options.get('knx', {}))
     validate_config(options['repository'])
     bounds = {'parallel_requests': (1, 16), 'response_bytes': (65536, 8388608),
               'log_lines': (1, 2000), 'retention_days': (1, 90), 'storage_megabytes': (256, 65536)}

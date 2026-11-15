@@ -8,6 +8,12 @@ configuration:
       read_enabled:
         name: Allow assistant to read the KNX project
         description: Project reads only. Assistant writes, deletion and bus access remain denied.
+      repository_directory:
+        name: KNX repository folder
+        description: Relative to the configured Git repository. Defaults to knx_editor; do not exclude your KNX entity YAML folder from HA restarts. Setup checks for the configured project file here; editor import is still manual.
+      project_filename:
+        name: KNX project filename
+        description: Exact .knxproj filename inside that folder, including its extension. Defaults to project.knxproj. No wildcard search or automatic import.
   repository:
     name: Configuration repository
     description: Optional independent Git checkout. Authenticate in the Pi Web terminal. Restart the app after changes.

@@ -496,3 +496,27 @@ rollback are not implemented. Do not treat it as the leading project store yet.
 HA backups now stop the app briefly to preserve SQLite consistency. The original
 project remains the fallback. See [implementation and HA test steps](../docs/KNX-EDITOR-IMPLEMENTATION.md)
 for the exact boundaries, missing features and unverified build/HA behavior.
+
+Set `knx.repository_directory` (default `knx_editor`) and `knx.project_filename`
+(default `project.knxproj`) to identify the repository source. For example:
+
+```yaml
+knx:
+  enabled: true
+  read_enabled: true
+  repository_directory: knx_editor
+  project_filename: project.knxproj
+```
+
+Paths are relative to the configured Git repository. Restart after changes.
+**Setup & house notes** checks for the exact file `knx_editor/project.knxproj`;
+set `project_filename` to your existing name if desired. This check does not
+validate its contents, import it, or synchronize it with the active editor project.
+Import a copy manually through KNX Editor; manual uploads accept any filename.
+The private working format is `.xknx`.
+
+Exclude only the editor-only repository folder (`knx_editor/` by default) from
+restart-after-sync in the separate HA Git app. Keep `knx/` included in normal
+restart detection if it contains Home Assistant entity YAMLs. Pi Butler does not
+modify those restart rules. Private app storage `/data/knx` and the ingress URL
+`butler/knx/` are independent of the configured repository folder.

@@ -120,6 +120,10 @@ import json, urllib.request, urllib.error
 from pathlib import Path
 mcp = json.loads(Path("/data/pi/mcp.json").read_text())["mcpServers"]
 assert mcp["pi_butler_knx"]["args"] == ["--knx"]
+# This startup used the old two-switch options above; new defaults must migrate.
+knx = json.loads(Path("/etc/pi-butler/knx.json").read_text())
+assert knx["repository_directory"] == "knx_editor"
+assert knx["project_filename"] == "project.knxproj"
 for port, route in [(8511, "/"), (8511, "/upload"), (8511, "/files/key/file"), (8512, "/mcp")]:
     try:
         urllib.request.urlopen(f"http://127.0.0.1:{port}{route}", timeout=5)

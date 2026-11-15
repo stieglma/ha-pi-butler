@@ -118,7 +118,14 @@ checks process startup/private boundaries. The amd64 build and expanded containe
 smoke passed locally on Colima on 2026-11-15 after reproducing and fixing the clean
 environment mismatch and separate MCP startup race. Both boundary probes retain
 all credential/capability assertions; endpoint checks wait for each listener and
-still require denied responses. Runtime version/native checks, all 93 Python
+still require denied responses. Runtime version/native checks, all 98 Python
 container tests, and the plugin, marketplace and model-readiness smokes also passed
 locally against that image. Original-project import, export,
 HA ingress, bus connectivity and device support have no acceptance evidence yet.
+
+
+KNX repository source options default to `knx_editor/project.knxproj`. Tests cover
+old-option migration, custom nested directories/filenames, missing files, exact
+selection without fallback, and rejection of traversal/symlink/nonregular sources.
+Setup reports only presence and manual-import status. The container smoke also
+checks migration from the old two-switch options to the new location defaults.

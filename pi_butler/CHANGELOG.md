@@ -2,6 +2,8 @@
 
 ## 1.1.0-beta.1
 
+- Configurable KNX repository folder and project filename, defaulting to `knx_editor/project.knxproj`, with an explicit manual-import source check in Setup.
+
 - Optional isolated KNX Editor admin UI, automatically registered finite read-only MCP tools, and configurable assistant read access.
 - Experimental HA acceptance build: automatic Git checkpoints, synchronized exports and rollback are not implemented yet. Keep an original project copy.
 

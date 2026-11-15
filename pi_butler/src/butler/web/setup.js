@@ -1,6 +1,6 @@
 'use strict';
 const byId = (id) => document.getElementById(id);
-const labels = { model: 'Model configuration', ha: 'Home Assistant connection', scratch: 'Investigation project', repository: 'Repository setup', git: 'Git authentication', repository_project: 'Repository project' };
+const labels = { model: 'Model configuration', ha: 'Home Assistant connection', scratch: 'Investigation project', repository: 'Repository setup', git: 'Git authentication', repository_project: 'Repository project', knx_project: 'KNX repository source (manual import)' };
 const states = { ready: 'Ready', pending: 'Needs attention', not_configured: 'Optional', optional: 'Optional', unknown: 'Check manually' };
 let version;
 let savedText = '';
@@ -17,6 +17,7 @@ async function refresh() {
     const result = await api('status');
     byId('checks').replaceChildren();
     for (const [key, label] of Object.entries(labels)) {
+      if (key === 'knx_project' && !result.checks?.[key]) continue;
       const check = result.checks?.[key] || { state: 'pending', help: 'Waiting for the first setup check.' };
       const item = document.createElement('li');
       item.dataset.state = check.state;
