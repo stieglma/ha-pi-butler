@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1-beta.1
+
+- Test the unreleased XKNX Editor fix from PR #329, pinned to commit `fc92b8587c16da3f71587d5278b050e3055a85ec` with a verified source archive checksum. The editor still reports version 0.15.3.
+- Accept allocated memory segments at base address zero, including the ABB SA/S12.16.5.2 PEI program, during downloads and memory comparisons. Handle genuinely unallocated segments explicitly.
+- Beta for target-device validation; synthetic tests do not establish a successful physical-device download.
+
 ## 1.3.0
 
 - Add passive assistant reads for KNX Health, Operations, project edit history and imported ETS project log.
