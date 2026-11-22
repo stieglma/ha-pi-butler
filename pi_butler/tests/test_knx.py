@@ -40,7 +40,7 @@ class KnxTests(unittest.IsolatedAsyncioTestCase):
                 validate(name, args)
         result = await dispatch({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'}, None, TOOLS)
         self.assertEqual(result['result']['tools'], TOOLS)
-        self.assertEqual(len(READ_TOOLS), 6)
+        self.assertEqual(len(READ_TOOLS), 15)
         self.assertEqual(len(TOOLS), len(READ_TOOLS) + len(WRITES))
 
     async def test_gateway_policy_and_errors_never_leak_token(self):

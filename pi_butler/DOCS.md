@@ -39,15 +39,15 @@ The image includes and registers these pinned Pi packages on first startup:
 | --- | --- | --- |
 | @juicesharp/rpiv-ask-user-question | 2.15.0 | Structured clarification questions; terminal UI and RPC dialog fallback |
 | pi-powerline-footer | 0.22.0 | Terminal footer and supported hosted status widgets |
-| @quintinshaw/pi-dynamic-workflows | 3.15.0 | Workflow orchestration, skills and child agents |
-| pi-subagents | 0.87.0 | Delegation, agent definitions and workflow resources |
+| @quintinshaw/pi-dynamic-workflows | 3.15.3 | Workflow orchestration, skills and child agents |
+| pi-subagents | 0.89.2 | Delegation, agent definitions and workflow resources |
 | pi-claude-marketplace | 0.23.0 | Import commands, skills and other supported components from Claude marketplaces |
 
 Packages live in `/opt/runtime/node_modules`, installed from `package.json` and
 `package-lock.json` during the image build. The `piButler.packages` list in
 `package.json` selects packages registered in `/data/pi/settings.json`. Startup
 registers their local directories as the pi user, without running `pi install`
-against npm or needing a network connection. The pinned Node runtime is 24.15.0
+against npm or needing a network connection. The pinned Node runtime is 24.22.3
 to satisfy the marketplace package's supported engine range.
 
 Existing provider settings, other package declarations and resource filters are
@@ -190,7 +190,7 @@ may need to be included in the app image. User Pi package declarations in
 
 ### Project setup capabilities
 
-The pinned Pi Web 1.202611.1 package accepts a separate display `name` when adding
+The pinned Pi Web 1.202611.5 package accepts a separate display `name` when adding
 a project. Its current Add Project UI does not supply that field, and its project
 store exposes add/list/get/remove but no rename operation. A friendly name can
 therefore be supplied during creation through the API; renaming an existing
@@ -538,7 +538,7 @@ Password-protected exchange archives can still be imported through the editor UI
   and mutation run in the same locked UI task, with checkpoints before and after. Normal queued UI device programming also requires a complete
   checkpoint before starting; an export failure blocks that programming operation.
 
-The `pi_butler_knx` MCP retains its six reads and adds seven finite offline project
+The `pi_butler_knx` MCP provides fifteen reads and seven finite offline project
 writes: device rename, parameter changes, group address creation/rename/deletion,
 and communication object linking/unlinking. `knx.read_enabled` controls reads;
 write grants are managed separately in the administrator page. No generic dispatch,
@@ -576,3 +576,38 @@ With KNX disabled and an empty list, only standard-port/multicast/broadcast guar
 apply. Unlisted custom-port gateways, external relays/proxies and separately granted
 HA actions are not covered by that direct network restriction. Actual HAOS
 kernel/AppArmor compatibility still needs acceptance testing.
+
+## Passive KNX diagnostics (1.3.0)
+
+With KNX enabled and `knx.read_enabled: true`, the assistant can inspect:
+
+- `project_health`: stored project findings; filter by category and severities.
+  This is project validation, not proof of live bus health.
+- `connection_operations`: active/waiting operations and session-local ended
+  operations, with progress, errors and result details. Optional `node_id` filters
+  both lists; `history: false` excludes ended operations. No operations are started
+  or canceled. Active and history lists each have their own pagination metadata.
+- `project_history`: project edit steps, including reverted steps; optional `since`
+  accepts ISO 8601 (UTC when no timezone is supplied). This does not undo changes.
+- `project_log`: the imported ETS project log, with `contains` filtering. The editor
+  does not append entries; encrypted comments can be unavailable.
+- `monitor_telegrams`: already recorded group telegrams, oldest first; optional
+  `source`, `destination` and `since` filters apply before pagination.
+- `monitor_latest`: last cached value of `address`, including its timestamp.
+  Values may be stale; absent records do not establish that no traffic occurred.
+- `project_get_ga_assignments`: reverse lookup from exactly one `group_address_id`
+  or `group_address` to linked project devices/communication objects.
+- `project_get_com_object_links`: group-address links of a `node_id` and
+  `com_object_ref_id`. Project links do not verify device programming.
+- `project_checkpoint_status`: active project identity/state, dirty state,
+  checkpoint/export error, storage and recovery-point metadata. It neither creates
+  nor restores a checkpoint and does not expose project paths or administrator IDs.
+
+List tools accept `offset` (default 0) and `limit` (default 100, maximum 200),
+returning `items`, `count`, `total` and `next_offset` (null at the end). Continue
+with `next_offset` to inspect more results. Operations use that shape per list;
+checkpoint status uses it inside `checkpoints`. These are snapshots, so concurrent
+changes can shift pages. Results remain capped at 2 MiB; narrow large queries.
+Telegram reads neither send bus requests nor enable or clear recording. These
+reads require no project mutation grant. Connection diagnostics, editor logs,
+active device reads and bus control are not exposed through these tools.

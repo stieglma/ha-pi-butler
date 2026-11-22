@@ -1,5 +1,6 @@
 """Real pinned editor services: synthetic project only, no GUI or bus."""
 import json
+import os
 from functools import partial
 import shutil
 from pathlib import Path
@@ -42,7 +43,7 @@ def main():
             project.new(root / 'projects/manual.xknx', name='Synthetic House')
             # Public upstream synthetic product fixture, never the user's project.
             import editor_gui
-            source = Path('/opt/knx/source')
+            source = Path(os.environ.get('KNX_EDITOR_SOURCE', '/opt/knx/source'))
             if not source.is_dir():
                 source = Path(editor_gui.__file__).resolve().parents[4]
             fixture = source / 'packages/prod/tests/fixtures/gira_2gang_button_interface.knxprod'
@@ -50,6 +51,16 @@ def main():
             products = catalog.import_knxprod(fixture)
             runtime.tools['project_add_device'](product_ref_id=products[0].product_ref_id, name='Synthetic Button')
             first = runtime.execute('checkpoint', {'comment': 'Initial'})
+            # Passive diagnostics against the actual pinned editor services.
+            def diagnostic(name, **args):
+                return runtime.execute('assistant', {'tool': name, 'arguments': args})
+            assert diagnostic('project_health', limit=1)['count'] <= 1
+            assert diagnostic('project_history', limit=1)['count'] <= 1
+            assert diagnostic('project_log', limit=1)['items'] == []
+            checkpoint_status = diagnostic('project_checkpoint_status', limit=1)
+            assert checkpoint_status['checkpoints']['items'][0]['id'] == first['id']
+            assert 'path' not in checkpoint_status['active']
+            assert checkpoint_status['dirty'] is False
             # Verify a native checkpoint carries product data without the live catalog.
             native = root / 'standalone.xknx'
             shutil.copyfile(runtime.projects.folder / first['id'] / 'project.xknx', native)
@@ -126,6 +137,9 @@ def main():
             co = next(co for co in device.com_objects if co.db_id is not None and co.dpt.token)
             ga = runtime.tools['project_create_group_address'](name='Permission probe', address='1/2/4')
             ga_id = ga['group_address_id']
+            assert diagnostic('project_get_ga_assignments', group_address_id=ga_id)['items'] == []
+            assert diagnostic('project_get_com_object_links', node_id=device.node_id,
+                              com_object_ref_id=co.id)['count'] >= 0
             guid = runtime.projects.active()['guid']
             grants = [{'project_guid': guid, 'capabilities': ['add', 'change'], 'node_ids': [device.node_id]}]
             runtime.execute('policy', {'version': runtime.policy_version(), 'grants': grants})

@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 from aiohttp import ClientSession, ClientTimeout, web
-from .knx import CAPABILITIES, validate
+from .knx import CAPABILITIES, DIAGNOSTIC_NAMES, validate
 from .policy import Rejected
 
 
@@ -68,7 +68,7 @@ def application(token, read_enabled, audit, call=call_editor):
             if not read_enabled and name not in CAPABILITIES:
                 raise Rejected('KNX assistant reads are disabled in app options')
             async with semaphore, asyncio.timeout(650):
-                if name in CAPABILITIES:
+                if name in CAPABILITIES or name in DIAGNOSTIC_NAMES:
                     async with ClientSession(timeout=ClientTimeout(total=650), trust_env=False) as client:
                         async with client.post('http://127.0.0.1:8511/butler-assistant',
                                 headers={'X-Butler-MCP-Token': token}, json={'tool': name, 'arguments': args},

@@ -10,7 +10,7 @@ import tempfile
 import threading
 import uuid
 
-from .knx import CAPABILITIES, authorize, normalize_policy, validate
+from .knx import CAPABILITIES, DIAGNOSTIC_NAMES, authorize, normalize_policy, validate
 from .knx_projects import Projects, ROOT, MAX_PROJECT, atomic_json
 from .policy import Rejected
 
@@ -30,12 +30,14 @@ class Runtime:
         # project functions run inside one locked UI task, including authorization.
         run_on_ui = ctx.run_on_ui
         ctx.run_on_ui = lambda fn, **kw: fn() if threading.current_thread() is threading.main_thread() else run_on_ui(fn, **kw)
-        from editor_gui.plugins.mcp.tools import project
+        from editor_gui.plugins.mcp.tools import project, operations, monitor
         class Registry:
             def tool(_self, fn, **kwargs):
                 self.tools[fn.__name__] = fn
                 return fn
         project.register(Registry(), ctx)
+        operations.register(Registry(), ctx)
+        monitor.register(Registry(), ctx)
         self.ctx = ctx
         self.projects = Projects(ctx, self.root)
         self.audit = logging.getLogger('butler.knx.editor.' + hashlib.sha256(str(self.root).encode()).hexdigest()[:12])
@@ -120,6 +122,8 @@ class Runtime:
                     raise Rejected('Invalid KNX request')
                 name, args = body['tool'], body['arguments']
                 validate(name, args)
+                if name in DIAGNOSTIC_NAMES:
+                    return self.diagnostic(name, args)
                 if name not in CAPABILITIES:
                     raise Rejected('Not an assistant project mutation')
                 active = projects.active()
@@ -151,6 +155,49 @@ class Runtime:
                 return {'result': result}
             raise ValueError('Unknown KNX action')
         return self.ctx.run_locked(work, timeout=600)
+
+    def diagnostic(self, name, args):
+        """Finite passive reads, filtered and bounded before leaving the editor."""
+        offset, limit = args.get('offset', 0), args.get('limit', 100)
+        query = {k: v for k, v in args.items() if k not in ('offset', 'limit')}
+
+        def page(items):
+            end = offset + limit
+            return {'items': items[offset:end], 'count': len(items[offset:end]),
+                    'total': len(items), 'next_offset': end if end < len(items) else None}
+
+        if name == 'project_checkpoint_status':
+            status = self.projects.status()
+            # Do not return project filesystem paths, grants or admin identity.
+            active = status['active']
+            return {'active': {k: active[k] for k in ('guid', 'name', 'state')} if active else None,
+                    'dirty': status['dirty'], 'error': status['error'], 'storage': status['storage'],
+                    'checkpoints': page([{k: row.get(k) for k in ('id', 'created', 'comment', 'source', 'state')}
+                                         for row in status['checkpoints']])}
+        if name == 'connection_operations':
+            node_id = query.pop('node_id', None)
+            result = self.tools[name](**query)
+            def selected(items):
+                return [item for item in items if node_id is None or item['node_id'] == node_id]
+            # The unqueued operation has no project node ID; omit when device-filtered.
+            return {'bus_operation': result['bus_operation'] if node_id is None else None,
+                    **{key: page(selected(result[key])) for key in ('active', 'history') if key in result}}
+        if name == 'monitor_telegrams':
+            from datetime import datetime, timezone
+            def stamp(value):
+                parsed = datetime.fromisoformat(value)
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+            since = stamp(query['since']) if 'since' in query else None
+            items = self.tools[name](limit=0)['items']
+            return page([item for item in items
+                         if all(item[key] == query[key] for key in ('source', 'destination') if key in query)
+                         and (since is None or stamp(item['timestamp']) >= since)])
+        if name == 'project_log':
+            result = self.tools[name](**query, offset=offset, limit=limit)
+            end = offset + len(result['items'])
+            return {**result, 'next_offset': end if end < result['total'] else None}
+        result = self.tools[name](**query)
+        return page(result['items']) if 'items' in result else result
 
     def import_source(self, source, actor=''):
         if not self.ctx:

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- Add passive assistant reads for KNX Health, Operations, project edit history and imported ETS project log.
+- Add recorded group telegrams, timestamped cached values, reverse group-address/object links and checkpoint/export status. Keep reads under the existing read switch, with bounded pagination and filters; no active bus requests or operation controls.
+- Update XKNX Editor to 0.15.3, Pi Coding Agent to 1.6.0, Pi Web to 1.202611.5, Dynamic Workflows to 3.15.3 and Subagents to 0.89.2.
+- Update Node 24 LTS to 24.22.3, editor CPython to 3.13.18, uv to 0.13.9, GitHub CLI to 2.105.0, GitLab CLI to 1.131.0, aiohttp to 3.14.5 and PyYAML to 6.0.4; refresh dependency locks and verified source/image pins.
+
 ## 1.2.1
 
 - Update bundled XKNX Editor to 0.14.1 with Siemens plug-in configuration support, Health/History/Logs UI improvements and a fix for parameter bit sizing during downloads.
