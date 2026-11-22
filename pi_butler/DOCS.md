@@ -611,3 +611,14 @@ changes can shift pages. Results remain capped at 2 MiB; narrow large queries.
 Telegram reads neither send bus requests nor enable or clear recording. These
 reads require no project mutation grant. Connection diagnostics, editor logs,
 active device reads and bus control are not exposed through these tools.
+
+## Beta 1.3.1-beta.1: zero table reference
+
+This beta builds XKNX Editor 0.15.3 plus the unreleased fix from
+[PR #329](https://github.com/XKNX/xknx-editor/pull/329), pinned to commit
+`fc92b8587c16da3f71587d5278b050e3055a85ec`. The editor's displayed version
+remains 0.15.3; include the commit when reporting results. The fix addresses
+allocated segments at base address zero, notably the ABB SA/S12.16.5.2 PEI
+program's parameter preflight/download. Synthetic checks do not prove the
+physical device now programs successfully; verify the original failing workflow
+on the target installation.
