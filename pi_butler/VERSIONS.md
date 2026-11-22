@@ -1,21 +1,21 @@
 # Pinned runtime inputs
 
-Resolved 2026-11-10. Publication and hashes are not proof of HA compatibility.
+Resolved 2026-11-22. Publication and hashes are not proof of HA compatibility.
 
 | Component | Pin |
 | --- | --- |
-| Node + Debian bookworm slim | node:24.15.0-bookworm-slim |
-| Base OCI index digest | sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d |
-| Pi | @earendil-works/pi-coding-agent 1.5.1 |
-| Pi Web | @jmfederico/pi-web 1.202611.1 |
+| Node + Debian bookworm slim | node:24.22.3-bookworm-slim |
+| Base OCI index digest | sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 |
+| Pi | @earendil-works/pi-coding-agent 1.6.0 |
+| Pi Web | @jmfederico/pi-web 1.202611.5 |
 | Ask user question | @juicesharp/rpiv-ask-user-question 2.15.0 |
 | Powerline footer | pi-powerline-footer 0.22.0 |
-| Dynamic workflows | @quintinshaw/pi-dynamic-workflows 3.15.0 |
-| Subagents | pi-subagents 0.87.0 |
+| Dynamic workflows | @quintinshaw/pi-dynamic-workflows 3.15.3 |
+| Subagents | pi-subagents 0.89.2 |
 | Claude marketplace | pi-claude-marketplace 0.23.0 |
-| GitHub CLI | 2.103.3 |
-| GitLab CLI | 1.128.0 |
-| uv | 0.11.28; OCI digest pinned in Dockerfile |
+| GitHub CLI | 2.105.0 |
+| GitLab CLI | 1.131.0 |
+| uv | 0.13.9; OCI digest pinned in Dockerfile |
 | Python dependencies | Direct dependencies in pyproject.toml; complete resolution and hashes in uv.lock |
 
 Npm dependencies and archive integrity values are committed in package-lock.json.
@@ -25,10 +25,10 @@ layout, HTTP serving, daemon socket creation and terminal plugin activation on
 macOS. Docker asserts native node-pty loading and Pi SDK resolution on amd64.
 
 GH archive SHA-256:
-`4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d`
+`79e7ab5db738c48777b696e374f8b428f0647debfb424f44d2f426370407fe2f`
 
 GLab archive SHA-256:
-`bc024819e7598b19429a199cd87f640d98b2b67416d8ad796f19e4260b57a7c7`
+`580dbca43835b47267e512476a442f6b2e8785a82b26ccacee22bd7010662b2d`
 
 Git/OpenSSH/Python/util-linux and CA certificates use Debian bookworm packages at
 build time. These OS packages are security-updated rather than individually
@@ -37,7 +37,7 @@ and record actual package versions when releasing a validated image.
 
 Primary references:
 
-- [Pi Web package](https://www.npmjs.com/package/@jmfederico/pi-web/v/1.202611.1)
+- [Pi Web package](https://www.npmjs.com/package/@jmfederico/pi-web/v/1.202611.5)
 - [Pi Web manual startup, SDK resolution and proxy deployment](https://pi-web.dev/install)
 - [Pi Web paths/configuration](https://pi-web.dev/config)
 - [Pi MCP](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/mcp.md)
@@ -48,18 +48,17 @@ Primary references:
 - [GitHub login](https://cli.github.com/manual/gh_auth_login)
 - [GitLab login](https://docs.gitlab.com/cli/auth/login/)
 
-The marketplace package requires Node ^24.15.0 on the Node 24 line; all five
-extensions loaded through Pi 1.5.1 on Node 24.15.0 locally. Pi Web also started
-with the initialized plugin profile. The image's SDK-resolution assertion uses
+The marketplace package requires Node ^24.15.0 on the Node 24 line; the bundled extensions are checked against the pinned Pi SDK by the image smoke tests.
+The earlier local startup evidence above predates this dependency refresh. The image's SDK-resolution assertion uses
 ES module import conditions because Pi does not expose a CommonJS root export.
 Marketplace MCP support is optional and pi-mcp-adapter is intentionally absent.
 
-## KNX runtime in 1.2.1 (2026-11-15)
+## KNX runtime in 1.3.0 (2026-11-22)
 
-- XKNX Editor 0.14.1, commit `88f5870886877acdae3b16a3b95c2b3e54d216c8`.
-  [Pinned source](https://github.com/XKNX/xknx-editor/tree/88f5870886877acdae3b16a3b95c2b3e54d216c8),
-  archive SHA-256 `02ae346472367ec2f149e4183a187d16418e00bd47face5b2d64e3716e1eb5a5`.
-- Independent managed CPython 3.13.14; upstream `uv.lock` pins all editor Python
+- XKNX Editor 0.15.3, commit `a6c45edbc197edfd388355bba828e25cbcadd754`.
+  [Pinned source](https://github.com/XKNX/xknx-editor/tree/a6c45edbc197edfd388355bba828e25cbcadd754),
+  archive SHA-256 `52ff1eb77535b0672bbc498d4d2d85970cafd8d9a84db02bec5d58d9af02fd21`.
+- Independent managed CPython 3.13.18; upstream `uv.lock` pins all editor Python
   dependencies, including FastMCP 4.2.0. No editor dependency enters Butler's venv.
 - xknxproject source commit `f97db068884eca2b460abb1fb4db2262345f7f47`, archive
   SHA-256 `96f2423a08d898d40da99163459506d27f9fb6a3edd99d13b83677805bcf9954`.

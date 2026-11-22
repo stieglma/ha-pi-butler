@@ -6,8 +6,8 @@ version = "0.0.0"
 description = "Policy-controlled Home Assistant tools and persistent Pi workspace services"
 requires-python = ">=3.11"
 dependencies = [
-    "aiohttp==3.13.2",
-    "PyYAML==6.0.3",
+    "aiohttp==3.14.5",
+    "PyYAML==6.0.4",
 ]
 
 [tool.uv]

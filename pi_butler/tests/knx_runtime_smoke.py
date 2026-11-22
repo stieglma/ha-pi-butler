@@ -68,6 +68,19 @@ def main():
                             assert time.monotonic()<deadline, Path('/tmp/knx-runtime.log').read_text()[-8000:]
                             time.sleep(.5)
                         assert status['active']['name']=='Runtime Synthetic', status
+                        for tool, arguments in [
+                            ('project_health', {'limit': 1}),
+                            ('connection_operations', {'limit': 1}),
+                            ('project_history', {'limit': 1}),
+                            ('project_log', {'limit': 1}),
+                            ('monitor_telegrams', {'limit': 1}),
+                            ('project_checkpoint_status', {'limit': 1}),
+                        ]:
+                            reply = client.post('http://127.0.0.1:8511/butler-assistant',
+                                headers={'X-Butler-MCP-Token': 'smoke-mcp-token'},
+                                json={'tool': tool, 'arguments': arguments})
+                            assert reply.status_code == 200, (tool, reply.text)
+                            assert '/data/knx' not in reply.text, (tool, reply.text)
                         assert not status['dirty'],status
                         assert (root/'active-project.json').exists()
                         assert client.get('http://127.0.0.1:8511/butler-api/status').status_code==403
