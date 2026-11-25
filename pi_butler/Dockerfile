@@ -52,8 +52,8 @@ FROM base AS knx-dependencies
 COPY --from=ghcr.io/astral-sh/uv:0.13.9@sha256:d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d /uv /usr/local/bin/uv
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
-# Experimental fix: XKNX/xknx-editor PR #329, pinned to its reviewed source commit.
-ADD --checksum=sha256:c2315c25f8bfd5aae830f63b7de32cf7848f488bd01ee28dce34c3ddd9ccfd6b https://codeload.github.com/XKNX/xknx-editor/tar.gz/fc92b8587c16da3f71587d5278b050e3055a85ec /tmp/editor.tar.gz
+# XKNX Editor release 0.15.5 includes the merged PR #329 zero-table-reference fix.
+ADD --checksum=sha256:29285785a97793210c35af4892f733bcb778095e1e6495654d1c5c131efaa9bb https://codeload.github.com/XKNX/xknx-editor/tar.gz/a1f19678b7c6affa3131359eded842705d56058d /tmp/editor.tar.gz
 RUN mkdir -p /opt/knx/source \
     && tar -xzf /tmp/editor.tar.gz -C /opt/knx/source --strip-components=1 \
     && rm /tmp/editor.tar.gz

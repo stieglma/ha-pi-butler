@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- Promote the working beta to a stable app release using official XKNX Editor 0.15.5, pinned to release commit `a1f19678b7c6affa3131359eded842705d56058d` and its verified source archive checksum.
+- Confirm the zero-table-reference fix from PR #329 is merged upstream and included since Editor 0.15.4; retain the fix for the ABB PEI program preflight/download issue.
+- Include upstream improvements for smaller servers, group-object sending links, wide tables, KNX Secure telegrams and KNX USB shutdown/recovery.
+
 ## 1.3.1-beta.1
 
 - Test the unreleased XKNX Editor fix from PR #329, pinned to commit `fc92b8587c16da3f71587d5278b050e3055a85ec` with a verified source archive checksum. The editor still reports version 0.15.3.
